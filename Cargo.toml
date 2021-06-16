@@ -1,0 +1,14 @@
+[package]
+name = "solver"
+version = "0.0.1"
+authors = ["alonso"]
+edition = "2018"
+
+
+[dependencies]
+pyo3 = { version = "0.13.2", features = ["extension-module"] }
+
+
+[lib]
+name = "solver"
+crate-type = ["rlib", "cdylib"]
