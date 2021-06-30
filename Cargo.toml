@@ -1,12 +1,14 @@
 [package]
 name = "solver"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["alonso"]
 edition = "2018"
 
 
 [dependencies]
 pyo3 = { version = "0.13.2", features = ["extension-module"] }
+ndarray = "0.15.2"
+optimization = {git = "https://github.com/Alonso-JAMM/Optimization.git"}
 
 
 [lib]
