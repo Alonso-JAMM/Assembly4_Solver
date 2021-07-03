@@ -46,6 +46,15 @@ impl ConstraintType {
         }
     }
 
+    pub fn get_diff(
+            &mut self,
+            sys_variables: &Vec<Variable>,
+    ) -> f64 {
+        match self {
+            Self::FixBaseConstraint(fix) => fix.get_diff(sys_variables)
+        }
+    }
+
     pub fn get_hessian(
             &self,
             sys_hess: &mut Array2<f64>,

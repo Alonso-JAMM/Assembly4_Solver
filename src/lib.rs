@@ -24,6 +24,8 @@ use constraints::ConstraintType;
 mod system;
 use system::System;
 
+use optimization::TrustNCG;
+
 
 #[pymodule]
 fn solver(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -77,31 +79,17 @@ fn build_constraints(objects: HashMap<&str, HashMap<&str, f64>>,
         // TODO: make a equality_constraint
      }
 
-    // At this point we have all the constraints and variables. We can proceed to
-    // solve this system of constraints.
-    // TODO: solve the system of constraints
-    //      1. Create array of variables used by the solver (enabled variables)
-    //      2. Assign a index of the solver variables to the corresponding
-    //         system variables
-    //      3. Construct problem type that will be given to the solver.
-
-
-
-    // check we have all the objects
-//     for (obj_name, obj_params) in &system.objects {
-//         println!("{}: {:?}", obj_name, obj_params);
-//     }
-//     for var in system.variables.iter() {
-//         println!("{:?}", var);
-//     }
+    // Un-comment this part in order to solve the problem (it is faster than the
+    // implementation in python
+//     system.add_indices();
+//     let x0 = system.start_position();
 //
-//     for constraint in system.constraints.iter_mut() {
-//         constraint.evaluate(&system.variables);
-//     }
-
-        // Test this to evaluate the constraint function
-//     for _ in 0..30 {
-//         system.constraints[0].evaluate(&system.variables);
-//     }
+//     let mut min = TrustNCG::new();
+//
+//     let sol = min.minimize(&x0, &mut system);
+//
+//     println!("Solution succeeded?: {}, iterations: {}, function evaluations: {}, \
+//     gradient evaluations: {}", sol.success, sol.iter_num, sol.f_evals, sol.f_grad_evals);
+//     println!("solution x: {}", sol.x);
 }
 

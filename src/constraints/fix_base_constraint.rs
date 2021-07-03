@@ -210,6 +210,13 @@ impl Constraint for FixBaseConstraint {
         }
      }
 
+     fn get_diff(
+            &mut self,
+            sys_variables: &Vec<Variable>,
+     ) -> f64 {
+        self.eval(sys_variables).e1
+     }
+
     fn get_hessian(
             &self,
             system_hess: &mut Array2<f64>,

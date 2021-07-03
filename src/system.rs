@@ -15,6 +15,9 @@
 
 use std::collections::HashMap;
 use crate::constraints::*;
+use ndarray::{Array1, Array2};
+
+use optimization::problem::{Objective, Gradient, Hessian};
 
 
 /// This struct stores the indices of all the variables (6 variables) that
@@ -167,4 +170,101 @@ impl<'a> System<'a> {
             Some(_) => ()
         }
     }
+
+
+    /// Adds indices to the enabled variables in the system
+    pub fn add_indices(&mut self) {
+        let mut i = 0;
+        for variable in self.variables.iter_mut() {
+            if variable.enabled {
+                variable.index = i;
+                i += 1;
+            }
+        }
+    }
+
+    /// Returns the number of enabled variables
+    pub fn get_enabled_size(&self) -> usize {
+        let mut i = 0;
+        for variable in self.variables.iter() {
+            if variable.enabled {
+                i += 1;
+            }
+        }
+        i
+    }
+
+    /// Returns the starting point for the solver
+    pub fn start_position(&self) -> Array1<f64> {
+        let n = self.get_enabled_size();
+        let mut output = Array1::zeros(n);
+        for variable in self.variables.iter() {
+            if variable.enabled {
+                output[variable.index] = variable.initial_value;
+            }
+        }
+        output
+    }
+}
+
+
+impl<'a> Objective for System<'a> {
+    fn eval(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.evaluate(&mut self.variables);
+        }
+    }
+
+    fn eval_real(&mut self) -> f64 {
+        self.eval();
+        let mut value = 0.0;
+        for constraint in &self.constraints {
+            value += constraint.get_value();
+        }
+        value
+    }
+
+    fn update_x(&mut self, x: &Array1<f64>) {
+        for variable in &mut self.variables {
+            variable.value = x[variable.index];
+        }
+    }
+
+    fn move_step(&mut self, x: &Array1<f64>, p: &Array1<f64>, alpha: f64) {
+        // we dont need this function, (at least for TrustNCG)
+        // If we implement an optimization method that requires to calculate the step
+        // then we need a method of updating the step. and to take partial derivatives
+        // with respect to alpha. Note that we could simply add a new method to the constraint
+        // functions that updates the internal variables by adding the corresponding step
+        // to the variables since the system itself doesn't know about the number system used
+    }
+}
+
+impl<'a> Gradient for System<'a> {
+    fn grad(&mut self, output: &mut Array1<f64>) {
+        for constraint in &mut self.constraints {
+            constraint.get_gradient(output, &self.variables);
+        }
+    }
+
+    fn diff(&mut self) -> f64 {
+        // We don't need this method? it could be added to the line_search trait?
+        // do we need to call move_step first?
+        let mut value = 0.0;
+        for constraint in &mut self.constraints {
+            value += constraint.get_diff(&self.variables);
+        }
+        value
+    }
+}
+
+
+impl<'a> Hessian for System<'a> {
+    fn hess(&mut self, output: &mut Array2<f64>) {
+        for constraint in &mut self.constraints {
+            constraint.get_hessian(output, &self.variables)
+        }
+
+    }
+
 }

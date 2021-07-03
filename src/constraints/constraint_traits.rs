@@ -37,6 +37,9 @@ pub trait Constraint {
     /// adds the gradient contribution of this constraint to the system gradient.
     fn get_gradient(&self, sys_grad: &mut Array1<f64>, sys_variables: &Vec<Variable>);
 
+    /// Gets the one-dimensional first derivative of the constraint function
+    fn get_diff(&mut self, sys_variables: &Vec<Variable>) -> f64;
+
     /// Gets the hessian matrix of the square of the constraint function. This
     /// method adds the hessian contribution of this constraint to the system
     /// hessian.
