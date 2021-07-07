@@ -16,6 +16,8 @@
 mod fix_base_constraint;
 pub use fix_base_constraint::FixBaseConstraint;
 
+pub mod equality_constraint;
+
 mod constraint_traits;
 use constraint_traits::Constraint;
 

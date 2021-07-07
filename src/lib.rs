@@ -77,6 +77,42 @@ fn build_constraints(
         // TODO: make a fix_rotation_constraint
         // TODO: make a lock_constraint
         // TODO: make a equality_constraint
+        if c.contains("Equality") {
+            // Now we have to have a way of stating which variables are equal
+            // NOTE: equal system variables point to the same solver variables. This
+            // way other constraints (like fix_base and fix_rotation) will be able
+            // to use any equal variable without any extra work (they would end up
+            // updating the correct gradient and hessian indices). Basically,
+            // equal variables are treated as only one variable.
+
+            // FIXME: Move this logic into system, the add_object() method should check
+            // that we are not trying to add the same object twice.
+            // Make sure we don't try to add the same object twice
+            let obj1_name = object_names.get("Object1").unwrap();
+            let obj2_name = object_names.get("Object2").unwrap();
+
+            if !system.objects.contains_key(obj1_name) {
+                // get the object variable values
+                let obj1_params = objects.get(obj1_name).unwrap();
+                // since object does not exist in the system, we add it and its
+                // corresponding variables
+                system.add_object(obj1_name, obj1_params);
+            }
+            if !system.objects.contains_key(obj2_name) {
+                // Do the same we did with the object but for the reference
+                let obj2_params = objects.get(obj2_name).unwrap();
+                system.add_object(obj2_name, obj2_params);
+            }
+            let object1 = system.objects.get(obj1_name).unwrap();
+            let object2 = system.objects.get(obj2_name).unwrap();
+            let c_params = constraint_parameters.get(c).unwrap();
+            constraints::equality_constraint::set_up_equalities(
+                &object1,
+                &object2,
+                &mut system.variables,
+                &c_params,
+            );
+        }
     }
 
     // Un-comment this part in order to solve the problem (it is faster than the

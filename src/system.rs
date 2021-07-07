@@ -97,6 +97,9 @@ pub struct Variable {
     /// determines whether the variable is enabled or not. If not enabled, then
     /// this variable will be ignored
     pub enabled: bool,
+    /// contains the index of the variable that is equal to this variable or none
+    /// if an equality constraint is not applied
+    pub equal: Option<usize>,
 }
 
 impl Variable {
@@ -107,6 +110,7 @@ impl Variable {
             initial_value: 0.0,
             locked: false,
             enabled: false,
+            equal: None,
         }
     }
 }
@@ -177,8 +181,28 @@ impl<'a> System<'a> {
         let mut i = 0;
         for variable in self.variables.iter_mut() {
             if variable.enabled {
-                variable.index = i;
-                i += 1;
+                match variable.equal {
+                    // we add indices of equal variables later
+                    Some(_) => (),
+                    None => {
+                        variable.index = i;
+                        i += 1;
+                    },
+                }
+            }
+        }
+
+        // We add indices to equal variables here because variables default with
+        // and index of 0 which means that we don't know if the other variable
+        // has an index of 0 or if its index is not defined yet.
+        // TODO: Would using Option<usize> for indices be better than defaulting
+        // to an index of 0?
+        // NOTE: we use indices since we need to have both immutable and mutable
+        // access to self.variables
+        for i in 0..self.variables.len() {
+            if let Some(j) = self.variables[i].equal {
+                self.variables[i].index = self.variables[j].index;
+                self.variables[i].initial_value = self.variables[j].initial_value;
             }
         }
     }
