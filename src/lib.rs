@@ -76,6 +76,27 @@ fn build_constraints(
         }
         // TODO: make a fix_rotation_constraint
         // TODO: make a lock_constraint
+        if c.contains("Lock") {
+            // WARNING: It is assumed that at this point any chained equality
+            // constraints with some locked constraint applied to any of the
+            // chained variables is already decomposed into multiple simple locked
+            // constraints.
+            let obj_name = object_names.get("Object").unwrap();
+
+            // FIXME: Move this logic into system...
+            if !system.objects.contains_key(obj_name) {
+                let obj_params = objects.get(obj_name).unwrap();
+                system.add_object(obj_name, obj_params);
+            }
+
+            let object = system.objects.get(obj_name).unwrap();
+            let c_params = constraint_parameters.get(c).unwrap();
+            constraints::lock_constraint::set_up_locks(
+                &object,
+                &mut system.variables,
+                &c_params,
+            );
+        }
         // TODO: make a equality_constraint
         if c.contains("Equality") {
             // Now we have to have a way of stating which variables are equal

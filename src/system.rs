@@ -185,8 +185,11 @@ impl<'a> System<'a> {
                     // we add indices of equal variables later
                     Some(_) => (),
                     None => {
-                        variable.index = i;
-                        i += 1;
+                        // Only add indices to unlocked variables
+                        if !variable.locked {
+                            variable.index = i;
+                            i += 1;
+                        }
                     },
                 }
             }
@@ -203,6 +206,10 @@ impl<'a> System<'a> {
             if let Some(j) = self.variables[i].equal {
                 self.variables[i].index = self.variables[j].index;
                 self.variables[i].initial_value = self.variables[j].initial_value;
+            }
+            // TODO: merge initia_value and value fields into one for Variable
+            if self.variables[i].locked {
+                self.variables[i].value = self.variables[i].initial_value;
             }
         }
     }
@@ -250,7 +257,10 @@ impl<'a> Objective for System<'a> {
 
     fn update_x(&mut self, x: &Array1<f64>) {
         for variable in &mut self.variables {
-            variable.value = x[variable.index];
+            // only work with enabled and unlocked variables
+            if variable.enabled && !variable.locked {
+                variable.value = x[variable.index];
+            }
         }
     }
 

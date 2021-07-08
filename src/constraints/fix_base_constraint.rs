@@ -169,11 +169,19 @@ impl Constraint for FixBaseConstraint {
         // now we can proceed and fill the hessian, the gradient, and the
         // constraint function value
         let mut fn_eval = HDual::new();
+        let mut var: &Variable;
         for i in 0..self.index_list.len() {
             // we only need to evaluate the upper half of the hessian matrix
             for j in i..self.index_list.len() {
-                self.variables[i].e1 = 1.0;
-                self.variables[j].e2 = 1.0;
+                var = &sys_variables[self.index_list[i]];
+                // Only work with enabled and unlocked variables
+                if var.enabled && !var.locked {
+                    self.variables[i].e1 = 1.0;
+                }
+                var = &sys_variables[self.index_list[j]];
+                if var.enabled && !var.locked {
+                    self.variables[j].e2 = 1.0;
+                }
 
                 // here we set the hessian matrix
                 fn_eval = self.eval(sys_variables);
@@ -203,10 +211,14 @@ impl Constraint for FixBaseConstraint {
     ) {
         let mut k: usize;    // variable index
         let mut ks: usize;   // solver variable index
+        let mut var: &Variable;
         for i in 0..self.index_list.len() {
             k = self.index_list[i];
-            ks = sys_variables[k].index;
-            system_grad[ks] = self.grad[i];
+            var = &sys_variables[k];
+            ks = var.index;
+            if var.enabled && !var.locked {
+                system_grad[ks] += self.grad[i];
+            }
         }
      }
 
@@ -227,13 +239,19 @@ impl Constraint for FixBaseConstraint {
         let mut ks: usize;  // solver variable index
         let mut l: usize;
         let mut ls: usize;  // solver variable index
+        let mut var_k: &Variable;
+        let mut var_l: &Variable;
         for i in 0..self.index_list.len() {
             for j in 0..self.index_list.len() {
                 k = self.index_list[i];
-                ks = sys_variables[k].index;
+                var_k = &sys_variables[k];
+                ks = var_k.index;
                 l = self.index_list[j];
-                ls = sys_variables[l].index;
-                system_hess[[ks, ls]] = self.hess[[i,j]];
+                var_l = &sys_variables[l];
+                ls = var_l.index;
+                if (var_k.enabled && !var_k.locked) && (var_l.enabled && !var_l.locked) {
+                    system_hess[[ks, ls]] += self.hess[[i,j]];
+                }
             }
         }
     }

@@ -18,6 +18,8 @@ pub use fix_base_constraint::FixBaseConstraint;
 
 pub mod equality_constraint;
 
+pub mod lock_constraint;
+
 mod constraint_traits;
 use constraint_traits::Constraint;
 
