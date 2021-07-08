@@ -276,6 +276,8 @@ impl<'a> Objective for System<'a> {
 
 impl<'a> Gradient for System<'a> {
     fn grad(&mut self, output: &mut Array1<f64>) {
+        // HACK: This should be done in the library
+        output.fill(0.0);
         for constraint in &mut self.constraints {
             constraint.get_gradient(output, &self.variables);
         }
@@ -295,6 +297,8 @@ impl<'a> Gradient for System<'a> {
 
 impl<'a> Hessian for System<'a> {
     fn hess(&mut self, output: &mut Array2<f64>) {
+        // HACK: This should be done in the library
+        output.fill(0.0);
         for constraint in &mut self.constraints {
             constraint.get_hessian(output, &self.variables)
         }
