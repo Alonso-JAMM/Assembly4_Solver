@@ -21,6 +21,7 @@ use optimization::geometry::{HDQuaternion, HDVector};
 use optimization::number_system::HyperDualScalar as HDual;
 
 use crate::system::{Variable, System, ObjectIndices};
+use crate::geometry::Quaternion;
 use crate::constraints::Constraint;
 
 
@@ -156,12 +157,20 @@ pub struct FixBaseConstraint {
     // contains the variables used to evaluate the constraint function. These values
     // are going to be used to evaluate the constraint function.
     variables: Vec<HDual>,
+    /// Contains the reference rotation quaternion,
+    ref_q: HDQuaternion,
+    /// Contains the index of the reference quaternion values
+    ref_q_index: usize,
 }
 
 
 impl Constraint for FixBaseConstraint {
 
-    fn evaluate(&mut self, sys_variables: &Vec<Variable>) {
+    fn evaluate(
+            &mut self,
+            sys_variables: &Vec<Variable>,
+            sys_q: &Vec<Quaternion>,
+    ) {
         // sys_variables is already updated. However, the local variables are
         // not updated yet.
         self.update_variables(sys_variables);
@@ -183,6 +192,9 @@ impl Constraint for FixBaseConstraint {
                     self.variables[j].e2 = 1.0;
                 }
 
+                // TODO: redo this part so that we skip variables of the reference
+                // rotation
+                self.get_ref_q(i, j, sys_q);
                 // here we set the hessian matrix
                 fn_eval = self.eval(sys_variables);
                 self.hess[[i,j]] = fn_eval.e1e2;
@@ -304,6 +316,19 @@ impl FixBaseConstraint {
         // variables that will be used to evaluate the constraint function
         let variables = vec![HDual::new(); 9];
 
+        // reference rotation quaternion values will be stored here
+        let ref_quaternion = Quaternion::new(
+            reference_indices.phi.sys,
+            reference_indices.theta.sys,
+            reference_indices.psi.sys,
+        );
+        let ref_q_index = system.quaternions.len();
+        // WARNING: this method doesnt't prevent repeated quaternions on the vector
+        // there should be a better method of storing the quaternions in order to
+        // avoid repetitions.
+        // TODO: remove possibility of repeated quaternions
+        system.quaternions.push(ref_quaternion);
+
         // TODO: is there a method of only enabling the needed rotation variables?
         //      For example if a LCS is constrained on the x-axis of another LCS,
         //      then rotation about the x-axis of the reference LCS is not required.
@@ -319,6 +344,8 @@ impl FixBaseConstraint {
             object_indices,
             reference_indices,
             variables,
+            ref_q: HDQuaternion::new(),
+            ref_q_index,
         }
     }
 
@@ -339,7 +366,7 @@ impl FixBaseConstraint {
 
         let p = self.get_obj();
         let rp = self.get_ref();
-        let ref_rot = self.get_ref_rot().inv();
+        let ref_rot = self.ref_q.inv();
 
         let f_base = self.get_f_base(obj_px_enabled, obj_py_enabled, obj_pz_enabled);
 
@@ -388,6 +415,42 @@ impl FixBaseConstraint {
             f_base.z = self.variables[self.object_indices.z.local];
         }
         f_base
+    }
+
+    /// Sets the current reference rotation quaternion from the given indices.
+    /// The provided indices are the local indices of the variables
+    fn get_ref_q(&mut self, i: usize, j: usize, sys_q: &Vec<Quaternion>) {
+        let phi_idx = self.reference_indices.phi.local;
+        let theta_idx = self.reference_indices.theta.local;
+        let psi_idx = self.reference_indices.psi.local;
+        let ref_q_vals = &sys_q[self.ref_q_index];
+
+        match i {
+            n if n == phi_idx => match j {
+                    m if m == phi_idx => self.ref_q = ref_q_vals.get_phi_phi(),
+                    m if m == theta_idx => self.ref_q = ref_q_vals.get_phi_theta(),
+                    m if m == psi_idx => self.ref_q = ref_q_vals.get_phi_psi(),
+                    _ => self.ref_q = ref_q_vals.get_phi_const(),
+            },
+            n if n == theta_idx => match j {
+                    m if m == phi_idx => self.ref_q = ref_q_vals.get_theta_phi(),
+                    m if m == theta_idx => self.ref_q = ref_q_vals.get_theta_theta(),
+                    m if m == psi_idx => self.ref_q = ref_q_vals.get_theta_psi(),
+                    _ => self.ref_q = ref_q_vals.get_theta_const(),
+            },
+            n if n == psi_idx => match j {
+                m if m == phi_idx => self.ref_q = ref_q_vals.get_psi_phi(),
+                m if m == theta_idx => self.ref_q = ref_q_vals.get_psi_theta(),
+                m if m == psi_idx => self.ref_q = ref_q_vals.get_psi_psi(),
+                _ => self.ref_q = ref_q_vals.get_psi_const(),
+            },
+            _ => match j {
+                m if m == phi_idx => self.ref_q = ref_q_vals.get_const_phi(),
+                m if m == theta_idx => self.ref_q = ref_q_vals.get_const_theta(),
+                m if m == psi_idx => self.ref_q = ref_q_vals.get_const_psi(),
+                _ => self.ref_q = ref_q_vals.get_const_const(),
+            }
+        }
     }
 
     /// Gets the vector representing the object to be fixed

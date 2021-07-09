@@ -15,6 +15,7 @@
 
 use ndarray::{Array1, Array2};
 use crate::system::Variable;
+use crate::geometry::Quaternion;
 
 
 /// General constraint methods used by the solver.
@@ -28,7 +29,7 @@ pub trait Constraint {
     /// internal variables that then are obtained by calling get_gradient and
     /// get_hessian. sys_variables should be the updated variables for the
     /// iteration.
-    fn evaluate(&mut self, sys_variables: &Vec<Variable>);
+    fn evaluate(&mut self, sys_variables: &Vec<Variable>, sys_q: &Vec<Quaternion>);
 
     /// Gets the real value of the square of constraint function
     fn get_value(&self) -> f64;

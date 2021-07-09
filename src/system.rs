@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 use crate::constraints::*;
+use crate::geometry::Quaternion;
 use ndarray::{Array1, Array2};
 
 use optimization::problem::{Objective, Gradient, Hessian};
@@ -129,6 +130,8 @@ pub struct System<'a> {
     /// Contains all the constraints in the system. When evaluating the objective
     /// function we are evaluating all the constraints of this vector.
     pub constraints: Vec<ConstraintType>,
+    // Contains all the rotation quaternions used by the constraints
+    pub quaternions: Vec<Quaternion>,
 }
 
 
@@ -138,6 +141,7 @@ impl<'a> System<'a> {
             objects: HashMap::new(),
             variables: Vec::new(),
             constraints: Vec::new(),
+            quaternions: Vec::new(),
         }
     }
 
@@ -242,7 +246,7 @@ impl<'a> System<'a> {
 impl<'a> Objective for System<'a> {
     fn eval(&mut self) {
         for constraint in &mut self.constraints {
-            constraint.evaluate(&mut self.variables);
+            constraint.evaluate(&mut self.variables, &self.quaternions);
         }
     }
 
@@ -261,6 +265,9 @@ impl<'a> Objective for System<'a> {
             if variable.enabled && !variable.locked {
                 variable.value = x[variable.index];
             }
+        }
+        for q in &mut self.quaternions {
+            q.update(&self.variables);
         }
     }
 

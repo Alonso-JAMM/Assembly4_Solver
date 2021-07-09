@@ -20,6 +20,7 @@ use pyo3::wrap_pyfunction;
 mod constraints;
 use constraints::ConstraintType;
 
+mod geometry;
 mod system;
 use system::System;
 

@@ -16,6 +16,7 @@
 use ndarray::{Array1, Array2};
 use crate::constraints::{Constraint, fix_base_constraint};
 use crate::system::Variable;
+use crate::geometry::Quaternion;
 
 // Used to group all types of constraints so they can be used in a single vector
 #[derive(Debug)]
@@ -24,9 +25,13 @@ pub enum ConstraintType {
 }
 
 impl ConstraintType {
-    pub fn evaluate(&mut self, sys_variables: &Vec<Variable>) {
+    pub fn evaluate(
+            &mut self,
+            sys_variables: &Vec<Variable>,
+            sys_q: &Vec<Quaternion>,
+    ) {
         match self {
-            Self::FixBaseConstraint(fix) => fix.evaluate(sys_variables),
+            Self::FixBaseConstraint(fix) => fix.evaluate(sys_variables, sys_q),
         }
     }
 
