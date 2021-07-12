@@ -15,3 +15,6 @@
 
 mod quaternion;
 pub use quaternion::Quaternion;
+
+mod vector;
+pub use vector::Vector;
