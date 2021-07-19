@@ -15,8 +15,7 @@
 
 use ndarray::{Array1, Array2};
 use crate::constraints::{Constraint, fix_base_constraint};
-use crate::system::Variable;
-use crate::geometry::Quaternion;
+use crate::system_object::SystemObject;
 
 // Used to group all types of constraints so they can be used in a single vector
 #[derive(Debug)]
@@ -27,11 +26,10 @@ pub enum ConstraintType {
 impl ConstraintType {
     pub fn evaluate(
             &mut self,
-            sys_variables: &Vec<Variable>,
-            sys_q: &Vec<Quaternion>,
+            sys_objects: &Vec<SystemObject>
     ) {
         match self {
-            Self::FixBaseConstraint(fix) => fix.evaluate(sys_variables, sys_q),
+            Self::FixBaseConstraint(fix) => fix.evaluate(sys_objects),
         }
     }
 
@@ -44,29 +42,28 @@ impl ConstraintType {
     pub fn get_gradient(
             &self,
             sys_grad: &mut Array1<f64>,
-            sys_variables: &Vec<Variable>
+            sys_objects: &Vec<SystemObject>,
     ) {
         match self {
-            Self::FixBaseConstraint(fix) => fix.get_gradient(sys_grad, sys_variables)
+            Self::FixBaseConstraint(fix) => fix.get_gradient(sys_grad, sys_objects)
         }
     }
 
     pub fn get_diff(
             &mut self,
-            sys_variables: &Vec<Variable>,
     ) -> f64 {
         match self {
-            Self::FixBaseConstraint(fix) => fix.get_diff(sys_variables)
+            Self::FixBaseConstraint(fix) => fix.get_diff()
         }
     }
 
     pub fn get_hessian(
             &self,
             sys_hess: &mut Array2<f64>,
-            sys_variables: &Vec<Variable>,
+            sys_objects: &Vec<SystemObject>,
     ) {
         match self {
-            Self::FixBaseConstraint(fix) => fix.get_hessian(sys_hess, sys_variables)
+            Self::FixBaseConstraint(fix) => fix.get_hessian(sys_hess, sys_objects)
         }
     }
 }

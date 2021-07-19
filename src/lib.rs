@@ -23,6 +23,7 @@ use constraints::ConstraintType;
 mod geometry;
 mod system;
 use system::System;
+mod system_object;
 
 use optimization::TrustNCG;
 
@@ -67,10 +68,19 @@ fn build_constraints(
             system.add_object(obj_name, obj_params);
             system.add_object(ref_name, ref_params);
 
+            // indices of the reference and object in the SystemObject vector
+            let ref_idx = *system.sys_objects_idx.get(ref_name).unwrap();
+            let obj_idx = *system.sys_objects_idx.get(obj_name).unwrap();
+
             // Finally, add the fix constraint. Note that a Fix constraint is
             // broken into fix base and fix rotation
             let fix_base_constraint =
-                constraints::FixBaseConstraint::new(&mut system, obj_name, ref_name, c_params);
+                constraints::FixBaseConstraint::new(
+                    &mut system.sys_objects,
+                    c_params,
+                    obj_idx,
+                    ref_idx
+                );
             system
                 .constraints
                 .push(ConstraintType::FixBaseConstraint(fix_base_constraint));
@@ -84,18 +94,16 @@ fn build_constraints(
             // constraints.
             let obj_name = object_names.get("Object").unwrap();
 
-            // FIXME: Move this logic into system...
-            if !system.objects.contains_key(obj_name) {
-                let obj_params = objects.get(obj_name).unwrap();
-                system.add_object(obj_name, obj_params);
-            }
+            let obj_params = objects.get(obj_name).unwrap();
+            system.add_object(obj_name, obj_params);
 
-            let object = system.objects.get(obj_name).unwrap();
+            let sys_obj_idx = *system.sys_objects_idx.get(obj_name).unwrap();
+            let sys_object = &mut system.sys_objects[sys_obj_idx];
+
             let c_params = constraint_parameters.get(c).unwrap();
             constraints::lock_constraint::set_up_locks(
-                &object,
-                &mut system.variables,
                 &c_params,
+                sys_object,
             );
         }
         // TODO: make a equality_constraint
@@ -107,46 +115,39 @@ fn build_constraints(
             // updating the correct gradient and hessian indices). Basically,
             // equal variables are treated as only one variable.
 
-            // FIXME: Move this logic into system, the add_object() method should check
-            // that we are not trying to add the same object twice.
-            // Make sure we don't try to add the same object twice
             let obj1_name = object_names.get("Object1").unwrap();
             let obj2_name = object_names.get("Object2").unwrap();
 
-            if !system.objects.contains_key(obj1_name) {
-                // get the object variable values
-                let obj1_params = objects.get(obj1_name).unwrap();
-                // since object does not exist in the system, we add it and its
-                // corresponding variables
-                system.add_object(obj1_name, obj1_params);
-            }
-            if !system.objects.contains_key(obj2_name) {
-                // Do the same we did with the object but for the reference
-                let obj2_params = objects.get(obj2_name).unwrap();
-                system.add_object(obj2_name, obj2_params);
-            }
-            let object1 = system.objects.get(obj1_name).unwrap();
-            let object2 = system.objects.get(obj2_name).unwrap();
+            let obj1_params = objects.get(obj1_name).unwrap();
+            let obj2_params = objects.get(obj2_name).unwrap();
+
+            system.add_object(obj1_name, obj1_params);
+            system.add_object(obj2_name, obj2_params);
+
+            let object1_idx = *system.sys_objects_idx.get(obj1_name).unwrap();
+            let object2_idx = *system.sys_objects_idx.get(obj2_name).unwrap();
             let c_params = constraint_parameters.get(c).unwrap();
             constraints::equality_constraint::set_up_equalities(
-                &object1,
-                &object2,
-                &mut system.variables,
                 &c_params,
+                object1_idx,
+                object2_idx,
+                &mut system.sys_objects,
             );
         }
     }
 
     // Un-comment this part in order to solve the problem (it is faster than the
     // implementation in python
-    //     system.add_indices();
-    //     let x0 = system.start_position();
-    //
-    //     let mut min = TrustNCG::new();
-    //
-    //     let sol = min.minimize(&x0, &mut system);
-    //
-    //     println!("Solution succeeded?: {}, iterations: {}, function evaluations: {}, \
-    //     gradient evaluations: {}", sol.success, sol.iter_num, sol.f_evals, sol.f_grad_evals);
-    //     println!("solution x: {}", sol.x);
+//         system.add_indices();
+//         let x0 = system.start_position();
+//
+//         let mut min = TrustNCG::new();
+//         min.i_max = 11;
+//
+//         let sol = min.minimize(&x0, &mut system);
+//
+//         println!("Solution succeeded?: {}, iterations: {}, function evaluations: {}, \
+//         gradient evaluations: {}", sol.success, sol.iter_num, sol.f_evals, sol.f_grad_evals);
+//         println!("solution x: {}", sol.x);
+
 }

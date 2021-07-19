@@ -15,70 +15,10 @@
 
 use std::collections::HashMap;
 use crate::constraints::*;
-use crate::geometry::Quaternion;
+use crate::system_object::{SystemObject, VariableIndex};
 use ndarray::{Array1, Array2};
 
 use optimization::problem::{Objective, Gradient, Hessian};
-
-
-/// This struct stores the indices of all the variables (6 variables) that
-/// represents an object in 3D space. It is used to obtain the variable from
-/// the vector of all the variables in the system.
-#[derive(Debug, Clone)]
-pub struct ObjectIndices {
-    pub x: usize,
-    pub y: usize,
-    pub z: usize,
-    pub phi: usize,
-    pub theta: usize,
-    pub psi: usize,
-}
-
-impl ObjectIndices {
-    /// Creates a new empty container. It is assumed that the indices of the
-    /// variables will be filled after creating a new ObjectIndices.
-    pub fn new() -> ObjectIndices {
-        ObjectIndices {
-            x: 0,
-            y: 0,
-            z: 0,
-            phi: 0,
-            theta: 0,
-            psi: 0,
-        }
-    }
-
-    /// fill a index of a variable.
-    pub fn set_index(&mut self, variable: &str, index: usize) {
-        match variable {
-            "x" => self.x = index,
-            "y" => self.y = index,
-            "z" => self.z = index,
-            "phi" => self.phi = index,
-            "theta" => self.theta = index,
-            "psi" => self.psi = index,
-            _ => ()
-        };
-    }
-
-    /// obtains the index of a variable from a str
-    pub fn get_index(&self, variable: &str) -> usize {
-        match variable {
-            "x" => self.x,
-            "y" => self.y,
-            "z" => self.z,
-            "phi" => self.phi,
-            "theta" => self.theta,
-            "psi" => self.psi,
-            // this should never happen. Only "x", "y", "z", "phi", "theta", "psi"
-            // should be used when dealing with ObjectIndices. Any other variable
-            // should be invalid. If an invalid variable is passed, then the code
-            // calling this function is doing something wrong and should be fixed!
-            _ => unreachable!()
-        }
-    }
-}
-
 
 /// A Variable represents one of the six values used to determine an object in
 /// 3D space. It is used internally to keep track of the placement of constrained
@@ -100,7 +40,7 @@ pub struct Variable {
     pub enabled: bool,
     /// contains the index of the variable that is equal to this variable or none
     /// if an equality constraint is not applied
-    pub equal: Option<usize>,
+    pub equal: Option<(usize, VariableIndex)>,
 }
 
 impl Variable {
@@ -121,27 +61,22 @@ impl Variable {
 /// and constraints in the system.
 #[derive(Debug)]
 pub struct System<'a> {
-    /// Contains all the objects in the system. The keys are the objects names
-    /// obtained from FreeCAD.
-    pub objects: HashMap<&'a str, ObjectIndices>,
-    /// Contains all the variables in the system. The objects represented by
-    /// these variables will contain the indices of the variables in this vector.
-    pub variables: Vec<Variable>,
     /// Contains all the constraints in the system. When evaluating the objective
     /// function we are evaluating all the constraints of this vector.
     pub constraints: Vec<ConstraintType>,
-    // Contains all the rotation quaternions used by the constraints
-    pub quaternions: Vec<Quaternion>,
+    /// Contains all the objects in the system
+    pub sys_objects: Vec<SystemObject>,
+    /// Contains the indices of the system objects in sys_objects
+    pub sys_objects_idx: HashMap<&'a str, usize>,
 }
 
 
 impl<'a> System<'a> {
     pub fn new() -> System<'a> {
         System {
-            objects: HashMap::new(),
-            variables: Vec::new(),
             constraints: Vec::new(),
-            quaternions: Vec::new(),
+            sys_objects: Vec::new(),
+            sys_objects_idx: HashMap::new(),
         }
     }
 
@@ -153,27 +88,23 @@ impl<'a> System<'a> {
             new_object_name: &'a str,
             object_params: &HashMap<&str, f64>,
     ) {
-        match self.objects.get(new_object_name) {
+        match self.sys_objects_idx.get(new_object_name) {
             None => {
-                let n = self.variables.len();
-                for _ in 0..6 {
-                    let new_variable = Variable::new();
-                    self.variables.push(new_variable);
-                }
+                let mut new_object = SystemObject::new();
 
-                let mut k: usize;   // variable index in the system variable vector
-                let mut x: f64;     // initial value of each variable
-                // The new variables are appended at the end of the vector
-                // so their indices will start at "n"
-                let mut new_object = ObjectIndices::new();
-                for (i, variable) in ["x", "y", "z", "phi", "theta", "psi"].iter().enumerate() {
-                    k = n+i;
-                    new_object.set_index(variable, k);
+                // initial value of each variable
+                let mut x: f64;
+
+                for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
+                    let mut new_var = new_object.vars.get_mut_variable(variable);
                     x = *object_params.get(variable).unwrap();
-                    self.variables[k].initial_value = x;
-                    self.variables[k].value = x;
+                    new_var.value = x;
+                    new_var.initial_value = x;
                 }
-                self.objects.insert(new_object_name, new_object);
+                self.sys_objects.push(new_object);
+                // object index in the system object HashMap
+                let n = self.sys_objects_idx.len();
+                self.sys_objects_idx.insert(new_object_name, n);
             },
             Some(_) => ()
         }
@@ -183,22 +114,23 @@ impl<'a> System<'a> {
     /// Adds indices to the enabled variables in the system
     pub fn add_indices(&mut self) {
         let mut i = 0;
-        for variable in self.variables.iter_mut() {
-            if variable.enabled {
-                match variable.equal {
-                    // we add indices of equal variables later
-                    Some(_) => (),
-                    None => {
-                        // Only add indices to unlocked variables
-                        if !variable.locked {
-                            variable.index = i;
-                            i += 1;
+        for obj in self.sys_objects.iter_mut() {
+            for variable in &mut obj.vars.iter_mut() {
+                if variable.enabled {
+                    match variable.equal {
+                        // we add indices of equal variables later
+                        Some(_) => (),
+                        None => {
+                            // Only add indices to unlocked variable
+                            if !variable.locked {
+                                variable.index = i;
+                                i += 1;
+                            }
                         }
-                    },
+                    }
                 }
             }
         }
-
         // We add indices to equal variables here because variables default with
         // and index of 0 which means that we don't know if the other variable
         // has an index of 0 or if its index is not defined yet.
@@ -206,24 +138,28 @@ impl<'a> System<'a> {
         // to an index of 0?
         // NOTE: we use indices since we need to have both immutable and mutable
         // access to self.variables
-        for i in 0..self.variables.len() {
-            if let Some(j) = self.variables[i].equal {
-                self.variables[i].index = self.variables[j].index;
-                self.variables[i].initial_value = self.variables[j].initial_value;
+        let vars = [VariableIndex::x, VariableIndex::y, VariableIndex::z,
+                    VariableIndex::phi, VariableIndex::theta, VariableIndex::psi];
+        for i in 0..self.sys_objects.len() {
+            for var_idx in &vars {
+                if let Some((j, j_var_idx)) = self.sys_objects[i].vars[*var_idx].equal {
+                    self.sys_objects[i].vars[*var_idx].index = self.sys_objects[j].vars[j_var_idx].index;
+                    self.sys_objects[i].vars[*var_idx].initial_value = self.sys_objects[j].vars[j_var_idx].initial_value;
+                }
             }
-            // TODO: merge initia_value and value fields into one for Variable
-            if self.variables[i].locked {
-                self.variables[i].value = self.variables[i].initial_value;
-            }
+
         }
+
     }
 
     /// Returns the number of enabled variables
     pub fn get_enabled_size(&self) -> usize {
         let mut i = 0;
-        for variable in self.variables.iter() {
-            if variable.enabled {
-                i += 1;
+        for obj in self.sys_objects.iter() {
+            for variable in obj.vars.iter() {
+                if variable.enabled {
+                    i += 1;
+                }
             }
         }
         i
@@ -233,9 +169,11 @@ impl<'a> System<'a> {
     pub fn start_position(&self) -> Array1<f64> {
         let n = self.get_enabled_size();
         let mut output = Array1::zeros(n);
-        for variable in self.variables.iter() {
-            if variable.enabled {
-                output[variable.index] = variable.initial_value;
+        for obj in self.sys_objects.iter() {
+            for variable in obj.vars.iter() {
+                if variable.enabled {
+                    output[variable.index] = variable.initial_value;
+                }
             }
         }
         output
@@ -246,7 +184,7 @@ impl<'a> System<'a> {
 impl<'a> Objective for System<'a> {
     fn eval(&mut self) {
         for constraint in &mut self.constraints {
-            constraint.evaluate(&mut self.variables, &self.quaternions);
+            constraint.evaluate(&self.sys_objects);
         }
     }
 
@@ -260,18 +198,22 @@ impl<'a> Objective for System<'a> {
     }
 
     fn update_x(&mut self, x: &Array1<f64>) {
-        for variable in &mut self.variables {
-            // only work with enabled and unlocked variables
-            if variable.enabled && !variable.locked {
-                variable.value = x[variable.index];
+        for obj in &mut self.sys_objects {
+            for variable in &mut obj.vars.iter_mut() {
+                if variable.enabled && !variable.locked {
+                    variable.value = x[variable.index];
+                }
             }
-        }
-        for q in &mut self.quaternions {
-            q.update(&self.variables);
+            if obj.q_enable {
+                obj.update_q();
+            }
+            if obj.v_enable {
+                obj.update_v();
+            }
         }
     }
 
-    fn move_step(&mut self, x: &Array1<f64>, p: &Array1<f64>, alpha: f64) {
+    fn move_step(&mut self, _x: &Array1<f64>, _p: &Array1<f64>, _alpha: f64) {
         // we dont need this function, (at least for TrustNCG)
         // If we implement an optimization method that requires to calculate the step
         // then we need a method of updating the step. and to take partial derivatives
@@ -286,18 +228,12 @@ impl<'a> Gradient for System<'a> {
         // HACK: This should be done in the library
         output.fill(0.0);
         for constraint in &mut self.constraints {
-            constraint.get_gradient(output, &self.variables);
+            constraint.get_gradient(output, &self.sys_objects);
         }
     }
 
     fn diff(&mut self) -> f64 {
-        // We don't need this method? it could be added to the line_search trait?
-        // do we need to call move_step first?
-        let mut value = 0.0;
-        for constraint in &mut self.constraints {
-            value += constraint.get_diff(&self.variables);
-        }
-        value
+        0.0
     }
 }
 
@@ -307,7 +243,7 @@ impl<'a> Hessian for System<'a> {
         // HACK: This should be done in the library
         output.fill(0.0);
         for constraint in &mut self.constraints {
-            constraint.get_hessian(output, &self.variables)
+            constraint.get_hessian(output, &self.sys_objects)
         }
 
     }

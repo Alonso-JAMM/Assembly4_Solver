@@ -389,7 +389,7 @@ fn flip_e1_e2(v: &mut HDVector) {
     v.y.e1 = v.y.e2;
     v.y.e2 = old_e1;
     old_e1 = v.z.e1;
-    v.y.e1 = v.z.e2;
+    v.z.e1 = v.z.e2;
     v.z.e2 = old_e1;
 }
 

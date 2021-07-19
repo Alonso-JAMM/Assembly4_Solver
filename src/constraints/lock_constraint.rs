@@ -15,28 +15,29 @@
 
 use std::collections::HashMap;
 
-use crate::system::{Variable, ObjectIndices};
-
+use crate::system_object::SystemObject;
 
 /// This function adds the lock constraints to the variables being locked.
 pub fn set_up_locks(
-        object: &ObjectIndices,
-        variables: &mut Vec<Variable>,
         c_params: &HashMap<&str, f64>,
+        sys_object: &mut SystemObject,
 ) {
-    let mut k: usize;
+    let mut locked_variables: Vec<&str> = Vec::new();
 
     for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
         match c_params.get(variable) {
             Some(_) => {
-                // We want to lock this variable
-                k = object.get_index(variable);
-                variables[k].locked = true;
-                // WARNING: do we need to enable the variable if it is going to be
-                // constant anyways?
-                variables[k].enabled = true;
+                locked_variables.push(variable);
             },
             None => ()
         }
     }
+    sys_object.lock_variables(&locked_variables);
+    sys_object.enable_variables(&locked_variables);
+
+    // WARNING: we are enabling both the rotation quaternion and position vector
+    // of the object, in some cases we should not enable them (it may slow things down
+    // by making unnecessary updates to the quaternion and the vector)
+    sys_object.q_enable = true;
+    sys_object.v_enable = true;
 }

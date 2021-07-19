@@ -15,54 +15,43 @@
 
 use std::collections::HashMap;
 
-use crate::system::{Variable, ObjectIndices};
+use crate::system_object::{SystemObject, VariableIndex};
 
 
 /// This function adds the objects being constrained to the system and their corresponding
 /// variables. Then it adds the corresponding equality constraints to the variables of
 /// the objects.
 pub fn set_up_equalities<>(
-        object1: &ObjectIndices,
-        object2: &ObjectIndices,
-        variables: &mut Vec<Variable>,
         c_params: &HashMap<&str, f64>,
+        sys_object1_idx: usize,
+        sys_object2_idx: usize,
+        sys_objects: &mut Vec<SystemObject>,
 ) {
-    let mut k: usize;
-    let mut j: usize;
-
-    // now we need to add the indices of the equal variables
+    let mut var_idx: VariableIndex;
+    let mut equal_variables: Vec<&str> = Vec::new();
+    let mut equal_indices: Vec<(&str, (usize, VariableIndex))> = Vec::new();
+    // now we add the indices of the equal variables
+    // NOTE: we assume that there are not chained equality constraints (they should
+    // be removed by the constraint front-end)
     for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
         match c_params.get(variable) {
             Some(_) => {
-                // The reference variable may also be equal to some other variable
-                // and we need to have the index of the "original" variable.
-                // This method ensures that all equal variables point to the same
-                // solver variable.
-                k = object1.get_index(variable);
-                j = object2.get_index(variable);
-                match variables[k].equal {
-                    // Object1's variable is equal to some other variable.
-                    // So we get the index of the other ( the"original") variable
-                    // and put it into the object2's variable.
-                    // NOTE: We assume object1's variable is enabled
-                    Some(i) => {
-                        variables[j].equal = Some(i);
-                    },
-                    // Object1's variable is the "original" variable (it is not
-                    // equal to other variable). So we then add its index to
-                    // object2's variable.
-                    // Object1's variable may or may not be enabled, so we
-                    // just simply enable it either way since we need it enabled.
-                    // Then, we need to add the index of the object1's variable
-                    // to the object2's variable.
-                    None => {
-                        variables[k].enabled = true;
-                        variables[j].equal = Some(k);
-                        variables[j].enabled= true;
-                    },
-                }
-            },
-            None => ()
+                var_idx = VariableIndex::get_from_str(variable);
+                equal_variables.push(variable);
+                equal_indices.push((variable, (sys_object1_idx, var_idx)));
+            }
+            None => (),
         }
     }
+    sys_objects[sys_object1_idx].enable_variables(&equal_variables);
+    sys_objects[sys_object2_idx].enable_variables(&equal_variables);
+    sys_objects[sys_object2_idx].add_equal_indices(&equal_indices);
+
+    // WARNING: we are enabling both rotation quaternion and position vector of the
+    // system objects. This may cause unnecessary updates on the quaternion or the vector
+    // we only need to enable them if one of their variables are enabled
+    sys_objects[sys_object1_idx].q_enable = true;
+    sys_objects[sys_object1_idx].v_enable = true;
+    sys_objects[sys_object2_idx].q_enable = true;
+    sys_objects[sys_object2_idx].v_enable = true;
 }

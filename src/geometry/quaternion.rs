@@ -38,18 +38,10 @@ pub struct Quaternion {
     theta_theta: HDQuaternion,
     theta_psi: HDQuaternion,
     psi_psi: HDQuaternion,
-    indices: QIndices,
-}
-
-#[derive(Debug)]
-struct QIndices {
-    phi: usize,
-    theta: usize,
-    psi: usize,
 }
 
 impl Quaternion {
-    pub fn new(phi: usize, theta: usize, psi: usize) -> Quaternion {
+    pub fn new() -> Quaternion {
         Quaternion {
             phi_phi: HDQuaternion::new(),
             phi_theta: HDQuaternion::new(),
@@ -57,20 +49,11 @@ impl Quaternion {
             theta_theta: HDQuaternion::new(),
             theta_psi: HDQuaternion::new(),
             psi_psi: HDQuaternion::new(),
-            indices: QIndices{phi, theta, psi},
         }
     }
 
-    /// Updates the values of the quaternion from the system variables
-    pub fn update(&mut self, sys_variables: &Vec<Variable>) {
-        let phi_var = &sys_variables[self.indices.phi];
-        let theta_var = &sys_variables[self.indices.theta];
-        let psi_var = &sys_variables[self.indices.psi];
-        self.evaluate_quaternion(phi_var, theta_var, psi_var);
-    }
-
     /// Evaluates all the quaternions with the different partial derivatives
-    fn evaluate_quaternion(
+    pub fn evaluate_quaternion(
             &mut self,
             phi_var: &Variable,
             theta_var: &Variable,
@@ -272,7 +255,7 @@ impl Quaternion {
     ///
     /// e1 corresponds to psi and e2 corresponds to phi
     pub fn get_psi_phi(&self) -> HDQuaternion {
-        let mut psi_phi = self.phi_theta;
+        let mut psi_phi = self.phi_psi;
         // Flip the partial derivatives of the components of the quaternion
         flip_e1_e2(&mut psi_phi);
         psi_phi

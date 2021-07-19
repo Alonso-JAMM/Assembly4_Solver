@@ -14,8 +14,7 @@
 
 
 use ndarray::{Array1, Array2};
-use crate::system::Variable;
-use crate::geometry::Quaternion;
+use crate::system_object::SystemObject;
 
 
 /// General constraint methods used by the solver.
@@ -29,20 +28,20 @@ pub trait Constraint {
     /// internal variables that then are obtained by calling get_gradient and
     /// get_hessian. sys_variables should be the updated variables for the
     /// iteration.
-    fn evaluate(&mut self, sys_variables: &Vec<Variable>, sys_q: &Vec<Quaternion>);
+    fn evaluate(&mut self, sys_objects: &Vec<SystemObject>);
 
     /// Gets the real value of the square of constraint function
     fn get_value(&self) -> f64;
 
     /// Gets the gradient of the square of the constraint function. This method
     /// adds the gradient contribution of this constraint to the system gradient.
-    fn get_gradient(&self, sys_grad: &mut Array1<f64>, sys_variables: &Vec<Variable>);
+    fn get_gradient(&self, sys_grad: &mut Array1<f64>, sys_obects: &Vec<SystemObject>);
 
     /// Gets the one-dimensional first derivative of the constraint function
-    fn get_diff(&mut self, sys_variables: &Vec<Variable>) -> f64;
+    fn get_diff(&mut self) -> f64;
 
     /// Gets the hessian matrix of the square of the constraint function. This
     /// method adds the hessian contribution of this constraint to the system
     /// hessian.
-    fn get_hessian(&self, sys_hess: &mut Array2<f64>, sys_variables: &Vec<Variable>);
+    fn get_hessian(&self, sys_hess: &mut Array2<f64>, sys_obects: &Vec<SystemObject>);
 }

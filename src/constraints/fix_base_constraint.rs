@@ -20,8 +20,8 @@ use ndarray::{Array1, Array2};
 use optimization::geometry::{HDQuaternion, HDVector};
 use optimization::number_system::HyperDualScalar as HDual;
 
-use crate::system::{Variable, System, ObjectIndices};
-use crate::geometry::Quaternion;
+use crate::system::Variable;
+use crate::system_object::SystemObject;
 use crate::constraints::Constraint;
 
 
@@ -53,75 +53,6 @@ impl FixParameters {
     }
 }
 
-
-/// Contains the system and local indices of each variable.
-#[derive(Debug)]
-struct VariableIndex {
-    pub sys: usize,
-    pub local: usize,
-}
-
-impl VariableIndex {
-    pub fn new() -> VariableIndex {
-        VariableIndex {
-            sys: 0,
-            local: 0,
-        }
-    }
-}
-
-
-/// The system and internal indices of the variables are stored here in order to
-/// know exactly which variable in the variable vector represents each variable in
-/// in the constraint function.
-#[derive(Debug)]
-struct Object {
-    pub x: VariableIndex,
-    pub y: VariableIndex,
-    pub z: VariableIndex,
-    pub phi: VariableIndex,
-    pub theta: VariableIndex,
-    pub psi: VariableIndex,
-}
-
-impl Object {
-    pub fn new() -> Object {
-        Object {
-            x: VariableIndex::new(),
-            y: VariableIndex::new(),
-            z: VariableIndex::new(),
-            phi: VariableIndex::new(),
-            theta: VariableIndex::new(),
-            psi: VariableIndex::new(),
-        }
-    }
-
-    pub fn get_variable(&self, variable: &str) -> &VariableIndex {
-        match variable {
-            "x" => &self.x,
-            "y" => &self.y,
-            "z" => &self.z,
-            "phi" => &self.phi,
-            "theta" => &self.theta,
-            "psi" => &self.psi,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_mut_variable(&mut self, variable: &str) -> &mut VariableIndex {
-        match variable {
-            "x" => &mut self.x,
-            "y" => &mut self.y,
-            "z" => &mut self.z,
-            "phi" => &mut self.phi,
-            "theta" => &mut self.theta,
-            "psi" => &mut self.psi,
-            _ => unreachable!(),
-        }
-    }
-}
-
-
 /// Fixes the 3D position (no rotation) of one object with respect to another
 ///
 /// Calculates f(x)^2 where f(x) represents the constraint function. Internally
@@ -139,28 +70,16 @@ pub struct FixBaseConstraint {
     /// hessian matrix of phi(y)^2
     hess: Array2<f64>,
     /// system variables indices of the internal variables. These are the
-    /// indices of the variables in the system variable vector. The size of this
-    /// vector may change depending on the amount of axis enabled.
+    /// indices of the variables in the system variable vector.
     index_list: Vec<usize>,
     /// Fix constraint values for the 3 position axis. These values represent
     /// "how far away" we are fixing the object with respect to the local coordinate
     /// system of the reference object.
     parameters: FixParameters,
-    /// fixed object indices. They are used to make the vectors and
-    /// quaternions needed for calculating the error of this constraint.
-    /// Note that we only require the x, y, and z components of obj_indices since
-    /// we are only fixing the 3 position axes.
-    object_indices: Object,
-    /// reference object indices. They are used to make the vectors and
-    /// quaternions needed for calculating the error of this constraint
-    reference_indices: Object,
-    // contains the variables used to evaluate the constraint function. These values
-    // are going to be used to evaluate the constraint function.
-    variables: Vec<HDual>,
-    /// Contains the reference rotation quaternion,
-    ref_q: HDQuaternion,
-    /// Contains the index of the reference quaternion values
-    ref_q_index: usize,
+    /// Index of the object in the vector of system objects
+    obj_index: usize,
+    /// Index of the reference in the vector of system objects
+    ref_index: usize,
 }
 
 
@@ -168,45 +87,77 @@ impl Constraint for FixBaseConstraint {
 
     fn evaluate(
             &mut self,
-            sys_variables: &Vec<Variable>,
-            sys_q: &Vec<Quaternion>,
+            sys_objects: &Vec<SystemObject>
     ) {
-        // sys_variables is already updated. However, the local variables are
-        // not updated yet.
-        self.update_variables(sys_variables);
+        let object = &sys_objects[self.obj_index];
+        let reference = &sys_objects[self.ref_index];
 
-        // now we can proceed and fill the hessian, the gradient, and the
-        // constraint function value
+        // The variables of the object being fixed
+        let obj_variables = ["x", "y", "z"];
+        // The variables of the reference object
+        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
+
+        // The first 3 variables are the object variables, then the next 6 variables
+        // are the reference variables so we need a way of offsetting them
+        let offset = 3;
+
+        // function evaluation
         let mut fn_eval = HDual::new();
-        let mut var: &Variable;
-        for i in 0..self.index_list.len() {
-            // we only need to evaluate the upper half of the hessian matrix
-            for j in i..self.index_list.len() {
-                var = &sys_variables[self.index_list[i]];
-                // Only work with enabled and unlocked variables
-                if var.enabled && !var.locked {
-                    self.variables[i].e1 = 1.0;
-                }
-                var = &sys_variables[self.index_list[j]];
-                if var.enabled && !var.locked {
-                    self.variables[j].e2 = 1.0;
-                }
 
-                // TODO: redo this part so that we skip variables of the reference
-                // rotation
-                self.get_ref_q(i, j, sys_q);
-                // here we set the hessian matrix
-                fn_eval = self.eval(sys_variables);
-                self.hess[[i,j]] = fn_eval.e1e2;
-                self.hess[[j,i]] = fn_eval.e1e2;
+        // vector representing the position of the object and the reference
+        let mut p: HDVector;
+        let mut rp: HDVector;
+        // quaternion representing the rotation of the reference
+        let mut rq: HDQuaternion;
 
-                self.variables[i].e1 = 0.0;
-                self.variables[j].e2 = 0.0;
+        // Start with the partial derivatives with respect to the object variables
+        // The object variables are: x, y, z
+        for (i, var1) in obj_variables.iter().enumerate() {
+            // Now find the other partial derivatives with respect to the object
+            // (we find the partial derivatives with respect to all the combinations
+            // of x, y, z for the object)
+            for (j, var2) in obj_variables.iter().enumerate() {
+                p = object.get_vector(var1, var2);
+                rp = reference.get_vector("", ""); // we evaluate the object variables
+                rq = reference.get_quaternion("", ""); // no evaluate the reference variables
+                fn_eval = self.eval(object, p, rp, rq);
+                self.hess[[i, j]] = fn_eval.e1e2;
             }
-            // here we set the gradient (equivalent of evaluating the function n times)
-            // we get this evaluation "free" from evaluating the hessian.
+
+            // now we add the first partial derivatives with respect to the variables
+            // of the object
             self.grad[i] = fn_eval.e1;
+
+            // And then we find the partial derivatives between variables of the object
+            // and variables of the reference.
+            for (j, var2) in ref_variables.iter().enumerate() {
+                // the first variable is an object variable
+                p = object.get_vector(var1, "");
+                // the second variable is a reference variable
+                rp = reference.get_vector("", var2);
+                rq = reference.get_quaternion("", var2);
+                fn_eval = self.eval(object, p, rp, rq);
+                self.hess[[i, j+offset]] = fn_eval.e1e2;
+                self.hess[[j+offset, i]] = fn_eval.e1e2;
+            }
         }
+
+        // Then do the partial derivatives with respect to the variables of the
+        // reference object
+        for (i, var1) in ref_variables.iter().enumerate() {
+            p = object.get_vector("", "");
+
+            for (j, var2) in ref_variables.iter().enumerate() {
+                rp = reference.get_vector(var1, var2);
+                rq = reference.get_quaternion(var1, var2);
+                fn_eval = self.eval(object, p, rp, rq);
+                self.hess[[i+offset, j+offset]] = fn_eval.e1e2;
+            }
+
+            // now add the gradients with respect to the reference variables
+            self.grad[i+offset] = fn_eval.e1;
+        }
+
         // All evaluations give the constraint function error but we only need
         // to assign it once to the value field.
         self.value = fn_eval.re;
@@ -219,50 +170,95 @@ impl Constraint for FixBaseConstraint {
      fn get_gradient(
             &self,
             system_grad: &mut Array1<f64>,
-            sys_variables: &Vec<Variable>
+            sys_objects: &Vec<SystemObject>,
     ) {
         let mut k: usize;    // variable index
-        let mut ks: usize;   // solver variable index
+        let object = &sys_objects[self.obj_index];
+        let reference = &sys_objects[self.ref_index];
+        let obj_variables = ["x", "y", "z"];
+        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
         let mut var: &Variable;
-        for i in 0..self.index_list.len() {
-            k = self.index_list[i];
-            var = &sys_variables[k];
-            ks = var.index;
+        let offset = 3; // offset between object variables and reference variables
+        // add the gradient values from object variables
+        for (i, variable) in obj_variables.iter().enumerate() {
+            var = object.vars.get_variable(variable);
+            k = var.index;
             if var.enabled && !var.locked {
-                system_grad[ks] += self.grad[i];
+                system_grad[k] += self.grad[i];
+            }
+        }
+        // add the gradient values from the reference variables
+        for (i, variable) in ref_variables.iter().enumerate() {
+            var = reference.vars.get_variable(variable);
+            k = var.index;
+            if var.enabled && !var.locked {
+                system_grad[k] += self.grad[i+offset];
             }
         }
      }
 
      fn get_diff(
             &mut self,
-            sys_variables: &Vec<Variable>,
      ) -> f64 {
-        self.eval(sys_variables).e1
+        1.0
      }
 
     fn get_hessian(
             &self,
             system_hess: &mut Array2<f64>,
-            sys_variables: &Vec<Variable>
+            sys_objects: &Vec<SystemObject>,
     ) {
         // system indices of the variables
         let mut k: usize;
-        let mut ks: usize;  // solver variable index
         let mut l: usize;
-        let mut ls: usize;  // solver variable index
-        let mut var_k: &Variable;
-        let mut var_l: &Variable;
-        for i in 0..self.index_list.len() {
-            for j in 0..self.index_list.len() {
-                k = self.index_list[i];
-                var_k = &sys_variables[k];
-                ks = var_k.index;
-                l = self.index_list[j];
-                var_l = &sys_variables[l];
-                ls = var_l.index;
-                if (var_k.enabled && !var_k.locked) && (var_l.enabled && !var_l.locked) {
-                    system_hess[[ks, ls]] += self.hess[[i,j]];
+        let object = &sys_objects[self.obj_index];
+        let reference = &sys_objects[self.ref_index];
+        let obj_variables = ["x", "y", "z"];
+        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
+        let mut variable1: &Variable;
+        let mut variable2: &Variable;
+        let offset = 3; // offset between object variables and reference variables
+
+        for (i, var1) in obj_variables.iter().enumerate() {
+            for (j, var2) in obj_variables.iter().enumerate() {
+                variable1 = object.vars.get_variable(var1);
+                variable2 = object.vars.get_variable(var2);
+                k = variable1.index;
+                l = variable2.index;
+
+                if (variable1.enabled && !variable1.locked) &&
+                   (variable2.enabled && !variable2.locked) {
+                    system_hess[[k, l]] += self.hess[[i, j]];
+
+                }
+
+            }
+
+            for (j, var2) in ref_variables.iter().enumerate()  {
+                variable1 = object.vars.get_variable(var1);
+                variable2 = reference.vars.get_variable(var2);
+                k = variable1.index;
+                l = variable2.index;
+
+                if (variable1.enabled && !variable1.locked) &&
+                   (variable2.enabled && !variable2.locked) {
+                    system_hess[[k, l]] += self.hess[[i, j+offset]];
+                    system_hess[[l, k]] += self.hess[[j+offset, i]];
+
+                }
+            }
+        }
+
+        for (i, var1) in ref_variables.iter().enumerate() {
+            for (j, var2) in ref_variables.iter().enumerate() {
+                variable1 = reference.vars.get_variable(var1);
+                variable2 = reference.vars.get_variable(var2);
+                k = variable1.index;
+                l = variable2.index;
+
+                if (variable1.enabled && !variable1.locked) &&
+                   (variable2.enabled && !variable2.locked) {
+                    system_hess[[k, l]] += self.hess[[i+offset, j+offset]];
                 }
             }
         }
@@ -272,16 +268,11 @@ impl Constraint for FixBaseConstraint {
 
 impl FixBaseConstraint {
     pub fn new(
-        system: &mut System,
-        obj_name: &str,
-        ref_name: &str,
-        constraint_parameters: &HashMap<&str, f64>
+        system_objects: &mut Vec<SystemObject>,
+        constraint_parameters: &HashMap<&str, f64>,
+        obj_index: usize,
+        ref_index: usize,
     ) -> FixBaseConstraint {
-
-        // Assuming that we already added the object and reference on the system
-        let object = system.objects.get(obj_name).unwrap();
-        let reference = system.objects.get(ref_name).unwrap();
-
         // Enable the position variables for both the reference and the object being fixed
         // and the 3 rotation variables of the reference. It is assumed that at this point
         // that at least one of the 3 position variables is enabled (otherwise we wouldn't
@@ -291,20 +282,31 @@ impl FixBaseConstraint {
         // always be enabled.
         // Also note that the variables are enabled in the vector of variables of the
         // system
-        enable_position_variables(object, constraint_parameters, &mut system.variables);
-        enable_position_variables(reference, constraint_parameters, &mut system.variables);
-        enable_rotation_variables(reference, &mut system.variables);
+        {
+            let sys_object = &mut system_objects[obj_index];
+            sys_object.enable_variables_from_params(constraint_parameters);
+            sys_object.v_enable = true;
+        }
+        {
+            let sys_reference = &mut system_objects[ref_index];
+            sys_reference.enable_variables_from_params(constraint_parameters);
+            // make sure we enable the rotation angles of the reference object
+            sys_reference.enable_variables(&["phi", "theta", "psi"]);
+            sys_reference.v_enable = true;
+            sys_reference.q_enable = true;
+        }
+
+        let sys_object = &system_objects[obj_index];
+        let sys_reference = &system_objects[ref_index];
 
         // Add the position and rotation variables to the object and reference
         // indices. Here we add all the indices of all the variables even the
         // disabled variables since we need to know their values when evaluating
         // the constraint function
-        let mut object_indices = Object::new();
-        let mut reference_indices = Object::new();
         let mut index_list = Vec::new();
-        add_position_variables(object, &mut index_list, &mut object_indices);
-        add_position_variables(reference, &mut index_list, &mut reference_indices);
-        add_rotation_variables(reference, &mut index_list, &mut reference_indices);
+        add_position_variables(sys_object, &mut index_list);
+        add_position_variables(sys_reference, &mut index_list);
+        add_rotation_variables(sys_reference, &mut index_list);
 
         // Adds the "offset" values used in the constraint function. Note that
         // the parameters of the disabled axes will be set to a value of 0.
@@ -313,66 +315,35 @@ impl FixBaseConstraint {
         let mut parameters = FixParameters::new();
         add_parameters(&mut parameters, constraint_parameters);
 
-        // variables that will be used to evaluate the constraint function
-        let variables = vec![HDual::new(); 9];
-
-        // reference rotation quaternion values will be stored here
-        let ref_quaternion = Quaternion::new(
-            reference_indices.phi.sys,
-            reference_indices.theta.sys,
-            reference_indices.psi.sys,
-        );
-        let ref_q_index = system.quaternions.len();
-        // WARNING: this method doesnt't prevent repeated quaternions on the vector
-        // there should be a better method of storing the quaternions in order to
-        // avoid repetitions.
-        // TODO: remove possibility of repeated quaternions
-        system.quaternions.push(ref_quaternion);
-
-        // TODO: is there a method of only enabling the needed rotation variables?
-        //      For example if a LCS is constrained on the x-axis of another LCS,
-        //      then rotation about the x-axis of the reference LCS is not required.
-        //      However, this only works when the LCS is constrained exactly on the
-        //      x-axis of the reference. Otherwise, the rotation about the x-axis of
-        //      the reference LCS is required.
         FixBaseConstraint {
             value: 0.0,
             grad: Array1::zeros(9),
             hess: Array2::zeros((9,9)),
             index_list,
             parameters,
-            object_indices,
-            reference_indices,
-            variables,
-            ref_q: HDQuaternion::new(),
-            ref_q_index,
-        }
-    }
-
-    /// Updates the local variables with the new values of the system variables
-    fn update_variables(&mut self, sys_variables: &Vec<Variable>) {
-        for (k_local, k_sys) in self.index_list.iter().enumerate() {
-            self.variables[k_local].re = sys_variables[*k_sys].value;
+            obj_index,
+            ref_index,
         }
     }
 
     /// This is the actual constraint function error. It is intended to be called
-    /// by the method evaluate() from the Constraint trait. This constraint function
-    /// doesn't care about the partial derivatives of the hyperdual scalar numbers.
-    fn eval(&self, sys_variables: &Vec<Variable>) -> HDual {
-        let obj_px_enabled = sys_variables[self.object_indices.x.sys].enabled;
-        let obj_py_enabled = sys_variables[self.object_indices.y.sys].enabled;
-        let obj_pz_enabled = sys_variables[self.object_indices.z.sys].enabled;
+    /// by the method evaluate() from the Constraint trait.
+    fn eval(
+            &self,
+            object: &SystemObject,
+            p: HDVector,
+            rp: HDVector,
+            rq: HDQuaternion,
+    ) -> HDual {
+        let obj_px_enabled = object.vars.x.enabled;
+        let obj_py_enabled = object.vars.y.enabled;
+        let obj_pz_enabled = object.vars.z.enabled;
 
-        let p = self.get_obj();
-        let rp = self.get_ref();
-        let ref_rot = self.ref_q.inv();
-
-        let f_base = self.get_f_base(obj_px_enabled, obj_py_enabled, obj_pz_enabled);
+        let f_base = self.get_f_base(obj_px_enabled, obj_py_enabled, obj_pz_enabled, &p);
 
         let v = p - rp;
 
-        let base_eval = ref_rot.mul_vec(&v) - f_base;
+        let base_eval = rq.inv().mul_vec(&v) - f_base;
 
         let mut result = HDual::new();
         //TODO: addasign operator
@@ -388,96 +359,38 @@ impl FixBaseConstraint {
         result
     }
 
-    /// Gets the vector f_base used in evaluating the constraint function
+    /// Gets the vector f_base used in evaluating the constraint function.
+    /// p is the position vector of the fixed object
     fn get_f_base(
             &self,
             obj_px_enabled: bool,
             obj_py_enabled: bool,
             obj_pz_enabled: bool,
+            p: &HDVector,
     ) -> HDVector {
         let mut f_base = HDVector::new();
         if obj_px_enabled {
             f_base.x.re = self.parameters.x;
         }
         else {
-            f_base.x = self.variables[self.object_indices.x.local];
+            f_base.x = p.x;
         }
         if obj_py_enabled {
             f_base.y.re = self.parameters.y;
         }
         else {
-            f_base.y = self.variables[self.object_indices.y.local];
+            f_base.y = p.y;
         }
         if obj_pz_enabled {
             f_base.z.re = self.parameters.z;
         }
         else {
-            f_base.z = self.variables[self.object_indices.z.local];
+            f_base.z = p.z;
         }
         f_base
+
     }
 
-    /// Sets the current reference rotation quaternion from the given indices.
-    /// The provided indices are the local indices of the variables
-    fn get_ref_q(&mut self, i: usize, j: usize, sys_q: &Vec<Quaternion>) {
-        let phi_idx = self.reference_indices.phi.local;
-        let theta_idx = self.reference_indices.theta.local;
-        let psi_idx = self.reference_indices.psi.local;
-        let ref_q_vals = &sys_q[self.ref_q_index];
-
-        match i {
-            n if n == phi_idx => match j {
-                    m if m == phi_idx => self.ref_q = ref_q_vals.get_phi_phi(),
-                    m if m == theta_idx => self.ref_q = ref_q_vals.get_phi_theta(),
-                    m if m == psi_idx => self.ref_q = ref_q_vals.get_phi_psi(),
-                    _ => self.ref_q = ref_q_vals.get_phi_const(),
-            },
-            n if n == theta_idx => match j {
-                    m if m == phi_idx => self.ref_q = ref_q_vals.get_theta_phi(),
-                    m if m == theta_idx => self.ref_q = ref_q_vals.get_theta_theta(),
-                    m if m == psi_idx => self.ref_q = ref_q_vals.get_theta_psi(),
-                    _ => self.ref_q = ref_q_vals.get_theta_const(),
-            },
-            n if n == psi_idx => match j {
-                m if m == phi_idx => self.ref_q = ref_q_vals.get_psi_phi(),
-                m if m == theta_idx => self.ref_q = ref_q_vals.get_psi_theta(),
-                m if m == psi_idx => self.ref_q = ref_q_vals.get_psi_psi(),
-                _ => self.ref_q = ref_q_vals.get_psi_const(),
-            },
-            _ => match j {
-                m if m == phi_idx => self.ref_q = ref_q_vals.get_const_phi(),
-                m if m == theta_idx => self.ref_q = ref_q_vals.get_const_theta(),
-                m if m == psi_idx => self.ref_q = ref_q_vals.get_const_psi(),
-                _ => self.ref_q = ref_q_vals.get_const_const(),
-            }
-        }
-    }
-
-    /// Gets the vector representing the object to be fixed
-    fn get_obj(&self) -> HDVector {
-        HDVector {
-            x: self.variables[self.object_indices.x.local],
-            y: self.variables[self.object_indices.y.local],
-            z: self.variables[self.object_indices.z.local],
-        }
-    }
-
-    /// Gets the vector representing the reference object
-    fn get_ref(&self) -> HDVector {
-        HDVector {
-            x: self.variables[self.reference_indices.x.local],
-            y: self.variables[self.reference_indices.y.local],
-            z: self.variables[self.reference_indices.z.local],
-        }
-    }
-
-    /// Gets the quaternion that represents the rotation of the reference object
-    fn get_ref_rot(&self) -> HDQuaternion {
-        let ref_phi = self.variables[self.reference_indices.phi.local];
-        let ref_theta = self.variables[self.reference_indices.theta.local];
-        let ref_psi = self.variables[self.reference_indices.psi.local];
-        HDQuaternion::from_angles(ref_phi, ref_theta, ref_psi)
-    }
 }
 
 
@@ -498,74 +411,25 @@ fn add_parameters(
 /// Adds the phi, theta, psi variables to the indices
 /// Note that we only add these variables to the reference object.
 fn add_rotation_variables(
-        object: &ObjectIndices,
+        object: &SystemObject,
         index_list: &mut Vec<usize>,
-        object_indices: &mut Object,
 ) {
     let mut k: usize;
-    let mut n: usize = index_list.len();
-    let mut object_variable: &mut VariableIndex;
     for variable in ["phi", "theta", "psi"].iter() {
-        k = object.get_index(variable);
+        k = object.vars.get_variable(variable).index;
         index_list.push(k);
-        object_variable = object_indices.get_mut_variable(variable);
-        object_variable.sys = k;
-        object_variable.local = n;
-        n += 1;
     }
 }
 
 
 /// Adds the x, y, and z variables to the indices.
 fn add_position_variables(
-        object: &ObjectIndices,
+        object: &SystemObject,
         index_list: &mut Vec<usize>,
-        object_indices: &mut Object,
 ) {
     let mut k: usize;
-    let mut n: usize = index_list.len();
-    let mut object_variable: &mut VariableIndex;
     for variable in ["x", "y", "z"].iter() {
-        k = object.get_index(variable);
+        k = object.vars.get_variable(variable).index;
         index_list.push(k);
-        object_variable = object_indices.get_mut_variable(variable);
-        object_variable.sys = k;
-        object_variable.local = n;
-        n += 1;
-    }
-}
-
-
-/// Enables the position variables that are constrained by this constraint function
-fn enable_position_variables(
-        object: &ObjectIndices,
-        constraint_parameters: &HashMap<&str, f64>,
-        variables: &mut Vec<Variable>,
-) {
-    let mut k: usize;
-    // The position variables may or may not be enabled.
-    for variable in ["x", "y", "z"].iter() {
-        match constraint_parameters.get(variable) {
-            Some(_) => {
-                k = object.get_index(variable);
-                variables[k].enabled = true;
-            },
-            None => ()
-
-        }
-    }
-}
-
-
-/// Enables the rotation variables that are constrained by this constraint function
-fn enable_rotation_variables(
-        reference: &ObjectIndices,
-        variables: &mut Vec<Variable>,
-) {
-    let mut k: usize;
-    // The rotation variables will always be enabled.
-    for variable in ["phi", "theta", "psi"].iter() {
-        k = reference.get_index(variable);
-        variables[k].enabled = true;
     }
 }
