@@ -66,9 +66,9 @@ pub struct FixBaseConstraint {
     /// value of phi(y)^2
     value: f64,
     /// gradient vector of phi(y)^2
-    grad: Array1<f64>,
+    grad: [f64; 9],
     /// hessian matrix of phi(y)^2
-    hess: Array2<f64>,
+    hess: [[f64; 9]; 9],
     /// system variables indices of the internal variables. These are the
     /// indices of the variables in the system variable vector.
     index_list: Vec<usize>,
@@ -126,8 +126,8 @@ impl Constraint for FixBaseConstraint {
             for (j, var2) in obj_variables.iter().enumerate().skip(i) {
                 p = object.get_vector(var1, var2);
                 fn_eval = self.eval(object, p, rp, rq);
-                self.hess[[i, j]] = fn_eval.e1e2;
-                self.hess[[j, i]] = fn_eval.e1e2;
+                self.hess[i][j] = fn_eval.e1e2;
+                self.hess[j][i] = fn_eval.e1e2;
             }
             // now we add the first partial derivatives with respect to the variables
             // of the object
@@ -144,8 +144,8 @@ impl Constraint for FixBaseConstraint {
                 rp = reference.get_vector("", var2);
                 rq = reference.get_quaternion("", var2);
                 fn_eval = self.eval(object, p, rp, rq);
-                self.hess[[i, j+offset]] = fn_eval.e1e2;
-                self.hess[[j+offset, i]] = fn_eval.e1e2;
+                self.hess[i][j+offset] = fn_eval.e1e2;
+                self.hess[j+offset][i] = fn_eval.e1e2;
             }
         }
 
@@ -161,8 +161,8 @@ impl Constraint for FixBaseConstraint {
                 rp = reference.get_vector(var1, var2);
                 rq = reference.get_quaternion(var1, var2);
                 fn_eval = self.eval(object, p, rp, rq);
-                self.hess[[i+offset, j+offset]] = fn_eval.e1e2;
-                self.hess[[j+offset, i+offset]] = fn_eval.e1e2;
+                self.hess[i+offset][j+offset] = fn_eval.e1e2;
+                self.hess[j+offset][i+offset] = fn_eval.e1e2;
             }
 
             // now add the gradients with respect to the reference variables
@@ -239,8 +239,7 @@ impl Constraint for FixBaseConstraint {
 
                 if (variable1.enabled && !variable1.locked) &&
                    (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[[i, j]];
-
+                    system_hess[[k, l]] += self.hess[i][j];
                 }
 
             }
@@ -253,9 +252,8 @@ impl Constraint for FixBaseConstraint {
 
                 if (variable1.enabled && !variable1.locked) &&
                    (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[[i, j+offset]];
-                    system_hess[[l, k]] += self.hess[[j+offset, i]];
-
+                    system_hess[[k, l]] += self.hess[i][j+offset];
+                    system_hess[[l, k]] += self.hess[j+offset][i];
                 }
             }
         }
@@ -269,7 +267,7 @@ impl Constraint for FixBaseConstraint {
 
                 if (variable1.enabled && !variable1.locked) &&
                    (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[[i+offset, j+offset]];
+                    system_hess[[k, l]] += self.hess[i+offset][j+offset];
                 }
             }
         }
@@ -328,8 +326,8 @@ impl FixBaseConstraint {
 
         FixBaseConstraint {
             value: 0.0,
-            grad: Array1::zeros(9),
-            hess: Array2::zeros((9,9)),
+            grad: [0.0; 9],
+            hess: [[0.0; 9]; 9],
             index_list,
             parameters,
             obj_index,
