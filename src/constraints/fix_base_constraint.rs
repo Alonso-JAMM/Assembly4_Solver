@@ -110,29 +110,36 @@ impl Constraint for FixBaseConstraint {
         // quaternion representing the rotation of the reference
         let mut rq: HDQuaternion;
 
-        // Start with the partial derivatives with respect to the object variables
+
+        // Start with the partial derivatives with respect to only the object variables
         // The object variables are: x, y, z
+
+        // Initially the vector and quaternion of the reference are not required
+        // for the evaluation of the partial derivatives with respect to only
+        // the variables of the object being fixed
+        rp = reference.get_vector("", ""); // we evaluate the object variables
+        rq = reference.get_quaternion("", ""); // no evaluate the reference variables
         for (i, var1) in obj_variables.iter().enumerate() {
             // Now find the other partial derivatives with respect to the object
             // (we find the partial derivatives with respect to all the combinations
             // of x, y, z for the object)
-            for (j, var2) in obj_variables.iter().enumerate() {
+            for (j, var2) in obj_variables.iter().enumerate().skip(i) {
                 p = object.get_vector(var1, var2);
-                rp = reference.get_vector("", ""); // we evaluate the object variables
-                rq = reference.get_quaternion("", ""); // no evaluate the reference variables
                 fn_eval = self.eval(object, p, rp, rq);
                 self.hess[[i, j]] = fn_eval.e1e2;
+                self.hess[[j, i]] = fn_eval.e1e2;
             }
-
             // now we add the first partial derivatives with respect to the variables
             // of the object
             self.grad[i] = fn_eval.e1;
+        }
 
-            // And then we find the partial derivatives between variables of the object
-            // and variables of the reference.
+        // Now find the partial derivatives with respect to the variables of both
+        // the object and the reference
+        for (i, var1) in obj_variables.iter().enumerate() {
+            // the first variable is an object variable
+            p = object.get_vector(var1, "");
             for (j, var2) in ref_variables.iter().enumerate() {
-                // the first variable is an object variable
-                p = object.get_vector(var1, "");
                 // the second variable is a reference variable
                 rp = reference.get_vector("", var2);
                 rq = reference.get_quaternion("", var2);
@@ -144,14 +151,18 @@ impl Constraint for FixBaseConstraint {
 
         // Then do the partial derivatives with respect to the variables of the
         // reference object
-        for (i, var1) in ref_variables.iter().enumerate() {
-            p = object.get_vector("", "");
 
-            for (j, var2) in ref_variables.iter().enumerate() {
+        // The position vector for the object being fixed remain constant over
+        // the evaluation of the partial derivatives with respect to the reference
+        // object's variables.
+        p = object.get_vector("", "");
+        for (i, var1) in ref_variables.iter().enumerate() {
+            for (j, var2) in ref_variables.iter().enumerate().skip(i) {
                 rp = reference.get_vector(var1, var2);
                 rq = reference.get_quaternion(var1, var2);
                 fn_eval = self.eval(object, p, rp, rq);
                 self.hess[[i+offset, j+offset]] = fn_eval.e1e2;
+                self.hess[[j+offset, i+offset]] = fn_eval.e1e2;
             }
 
             // now add the gradients with respect to the reference variables
