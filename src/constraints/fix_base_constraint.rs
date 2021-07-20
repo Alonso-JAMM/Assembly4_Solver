@@ -21,7 +21,7 @@ use optimization::geometry::{HDQuaternion, HDVector};
 use optimization::number_system::HyperDualScalar as HDual;
 
 use crate::system::Variable;
-use crate::system_object::SystemObject;
+use crate::system_object::{SystemObject, VariableName as VI};
 use crate::constraints::Constraint;
 
 
