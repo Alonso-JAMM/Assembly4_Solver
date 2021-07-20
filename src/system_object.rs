@@ -367,5 +367,85 @@ impl VariableName {
             _ => unreachable!(),
         }
     }
+
+    /// Returns an iterator over all the different options of VariableName
+    pub fn get_variable_iter() -> VariableNameIter {
+        VariableNameIter {
+            index: 0,
+        }
+    }
+
+    /// Returns an iterator over the position variables (x, y, z)
+    pub fn get_position_iter() -> PositionVariableNameIter {
+        PositionVariableNameIter {
+            index: 0,
+        }
+    }
+
+    /// Returns an iterator over the rotation variables (phi, theta, psi)
+    pub fn get_rotation_iter() -> RotationVariableNameIter {
+        RotationVariableNameIter {
+            index: 0,
+        }
+    }
 }
 
+
+pub struct VariableNameIter {
+    index: u8,
+}
+
+impl Iterator for VariableNameIter {
+    type Item = VariableName;
+    fn next(&mut self) -> Option<Self::Item> {
+        let var_idx = match self.index {
+            0 => VariableName::x,
+            1 => VariableName::y,
+            2 => VariableName::z,
+            3 => VariableName::phi,
+            4 => VariableName::theta,
+            5 => VariableName::psi,
+            _ => return None,
+        };
+        self.index += 1;
+        Some(var_idx)
+    }
+}
+
+
+pub struct PositionVariableNameIter {
+    index: u8,
+}
+
+impl Iterator for PositionVariableNameIter {
+    type Item = VariableName;
+    fn next(&mut self) -> Option<Self::Item> {
+        let var_idx = match self.index {
+            0 => VariableName::x,
+            1 => VariableName::y,
+            2 => VariableName::z,
+            _ => return None
+        };
+        self.index += 1;
+        Some(var_idx)
+    }
+}
+
+
+pub struct RotationVariableNameIter {
+    index: u8,
+}
+
+impl Iterator for RotationVariableNameIter {
+    type Item = VariableName;
+    fn next(&mut self) -> Option<Self::Item> {
+        let var_idx = match self.index {
+            0 => VariableName::phi,
+            1 => VariableName::theta,
+            2 => VariableName::psi,
+            _ => return None
+        };
+        self.index += 1;
+        Some(var_idx)
+    }
+}
