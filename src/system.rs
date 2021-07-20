@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 use crate::constraints::*;
-use crate::system_object::{SystemObject, VariableIndex};
+use crate::system_object::{SystemObject, VariableName};
 use ndarray::{Array1, Array2};
 
 use optimization::problem::{Objective, Gradient, Hessian};
@@ -40,7 +40,7 @@ pub struct Variable {
     pub enabled: bool,
     /// contains the index of the variable that is equal to this variable or none
     /// if an equality constraint is not applied
-    pub equal: Option<(usize, VariableIndex)>,
+    pub equal: Option<(usize, VariableName)>,
 }
 
 impl Variable {
@@ -138,8 +138,8 @@ impl<'a> System<'a> {
         // to an index of 0?
         // NOTE: we use indices since we need to have both immutable and mutable
         // access to self.variables
-        let vars = [VariableIndex::x, VariableIndex::y, VariableIndex::z,
-                    VariableIndex::phi, VariableIndex::theta, VariableIndex::psi];
+        let vars = [VariableName::x, VariableName::y, VariableName::z,
+                    VariableName::phi, VariableName::theta, VariableName::psi];
         for i in 0..self.sys_objects.len() {
             for var_idx in &vars {
                 if let Some((j, j_var_idx)) = self.sys_objects[i].vars[*var_idx].equal {

@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use crate::system_object::{SystemObject, VariableIndex};
+use crate::system_object::{SystemObject, VariableName};
 
 
 /// This function adds the objects being constrained to the system and their corresponding
@@ -27,16 +27,16 @@ pub fn set_up_equalities<>(
         sys_object2_idx: usize,
         sys_objects: &mut Vec<SystemObject>,
 ) {
-    let mut var_idx: VariableIndex;
+    let mut var_idx: VariableName;
     let mut equal_variables: Vec<&str> = Vec::new();
-    let mut equal_indices: Vec<(&str, (usize, VariableIndex))> = Vec::new();
+    let mut equal_indices: Vec<(&str, (usize, VariableName))> = Vec::new();
     // now we add the indices of the equal variables
     // NOTE: we assume that there are not chained equality constraints (they should
     // be removed by the constraint front-end)
     for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
         match c_params.get(variable) {
             Some(_) => {
-                var_idx = VariableIndex::get_from_str(variable);
+                var_idx = VariableName::get_from_str(variable);
                 equal_variables.push(variable);
                 equal_indices.push((variable, (sys_object1_idx, var_idx)));
             }

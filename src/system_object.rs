@@ -69,7 +69,7 @@ pub struct ObjectVariables {
 /// inside an Object.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone)]
-pub enum VariableIndex {
+pub enum VariableName {
     x,
     y,
     z,
@@ -126,8 +126,8 @@ impl SystemObject {
     ///
     /// equal_indices: contains all the necessary information to add the equality
     /// indices to the variables in the object. It contains the variable names and the
-    /// equality indices (equality indices are of the form of (usize, VariableIndex))
-    pub fn add_equal_indices(&mut self, equal_indices: &[(&str, (usize, VariableIndex))]) {
+    /// equality indices (equality indices are of the form of (usize, VariableName))
+    pub fn add_equal_indices(&mut self, equal_indices: &[(&str, (usize, VariableName))]) {
         for (variable, indices) in equal_indices {
             self.vars.get_mut_variable(variable).equal = Some(*indices);
         }
@@ -273,30 +273,30 @@ impl ObjectVariables {
 
 
 
-impl Index<VariableIndex> for ObjectVariables {
+impl Index<VariableName> for ObjectVariables {
     type Output = Variable;
-    fn index(&self, idx: VariableIndex) -> &Self::Output {
+    fn index(&self, idx: VariableName) -> &Self::Output {
         match idx {
-            VariableIndex::x => &self.x,
-            VariableIndex::y => &self.y,
-            VariableIndex::z => &self.z,
-            VariableIndex::phi => &self.phi,
-            VariableIndex::theta => &self.theta,
-            VariableIndex::psi=> &self.psi,
+            VariableName::x => &self.x,
+            VariableName::y => &self.y,
+            VariableName::z => &self.z,
+            VariableName::phi => &self.phi,
+            VariableName::theta => &self.theta,
+            VariableName::psi=> &self.psi,
         }
     }
 }
 
 
-impl IndexMut<VariableIndex> for ObjectVariables {
-    fn index_mut(&mut self, idx: VariableIndex) -> &mut Self::Output {
+impl IndexMut<VariableName> for ObjectVariables {
+    fn index_mut(&mut self, idx: VariableName) -> &mut Self::Output {
         match idx {
-            VariableIndex::x => &mut self.x,
-            VariableIndex::y => &mut self.y,
-            VariableIndex::z => &mut self.z,
-            VariableIndex::phi => &mut self.phi,
-            VariableIndex::theta => &mut self.theta,
-            VariableIndex::psi=> &mut self.psi,
+            VariableName::x => &mut self.x,
+            VariableName::y => &mut self.y,
+            VariableName::z => &mut self.z,
+            VariableName::phi => &mut self.phi,
+            VariableName::theta => &mut self.theta,
+            VariableName::psi=> &mut self.psi,
         }
     }
 }
@@ -353,17 +353,17 @@ impl<'a> Iterator for ObjectVariablesMutIter<'a> {
 }
 
 
-impl VariableIndex {
-    /// Returns a VariableIndex from an input variable name str. For example
-    /// if the input variable is "x" then this function will return VariableIndex::x
-    pub fn get_from_str(variable: &str) -> VariableIndex {
+impl VariableName {
+    /// Returns a VariableName from an input variable name str. For example
+    /// if the input variable is "x" then this function will return VariableName::x
+    pub fn get_from_str(variable: &str) -> VariableName {
         match variable {
-            "x" => VariableIndex::x,
-            "y" => VariableIndex::y,
-            "z" => VariableIndex::z,
-            "phi" => VariableIndex::phi,
-            "theta" => VariableIndex::theta,
-            "psi" => VariableIndex::psi,
+            "x" => VariableName::x,
+            "y" => VariableName::y,
+            "z" => VariableName::z,
+            "phi" => VariableName::phi,
+            "theta" => VariableName::theta,
+            "psi" => VariableName::psi,
             _ => unreachable!(),
         }
     }
