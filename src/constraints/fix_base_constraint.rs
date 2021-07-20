@@ -230,11 +230,13 @@ impl Constraint for FixBaseConstraint {
         let mut variable2: &Variable;
         let offset = 3; // offset between object variables and reference variables
 
+        // get the derivatives with respect to only the variables of the object to
+        // be fixed
         for (i, var1) in obj_variables.iter().enumerate() {
+            variable1 = object.vars.get_variable(var1);
+            k = variable1.index;
             for (j, var2) in obj_variables.iter().enumerate() {
-                variable1 = object.vars.get_variable(var1);
                 variable2 = object.vars.get_variable(var2);
-                k = variable1.index;
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
@@ -243,11 +245,16 @@ impl Constraint for FixBaseConstraint {
                 }
 
             }
+        }
+
+        // Get the derivatives with respect to both the object variables and the
+        // reference variables
+        for (i, var1) in obj_variables.iter().enumerate() {
+            variable1 = object.vars.get_variable(var1);
+            k = variable1.index;
 
             for (j, var2) in ref_variables.iter().enumerate()  {
-                variable1 = object.vars.get_variable(var1);
                 variable2 = reference.vars.get_variable(var2);
-                k = variable1.index;
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
@@ -258,11 +265,12 @@ impl Constraint for FixBaseConstraint {
             }
         }
 
+        // Get the derivatives with respect to only the reference variables
         for (i, var1) in ref_variables.iter().enumerate() {
+            variable1 = reference.vars.get_variable(var1);
+            k = variable1.index;
             for (j, var2) in ref_variables.iter().enumerate() {
-                variable1 = reference.vars.get_variable(var1);
                 variable2 = reference.vars.get_variable(var2);
-                k = variable1.index;
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
