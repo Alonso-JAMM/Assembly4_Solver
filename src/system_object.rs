@@ -30,7 +30,7 @@ use crate::geometry::{Quaternion, Vector};
 pub struct SystemObject{
     // Stores the actual variables that represent the position and rotation of this
     // object in 3D space.
-    pub vars: ObjectVariables,
+    vars: ObjectVariables,
     /// This field stores the quaternion rotation information about this object.
     /// The quaternion information is used by constraints functions in other to
     /// calculate the error.
@@ -151,31 +151,31 @@ impl SystemObject {
     ///
     /// The two passed variables represent the enabled object's placement variables
     /// x, y, z, phi, theta, psi.
-    pub fn get_vector(&self, var1: &str, var2: &str) -> HDVector {
+    pub fn get_vector(&self, var1: Option<VariableName>, var2: Option<VariableName>) -> HDVector {
         match var1 {
-            x if x == "x" => match var2 {
-                x if x == "x" => self.v_vals.get_x_x(),
-                y if y == "y" => self.v_vals.get_x_y(),
-                z if z == "z" => self.v_vals.get_x_z(),
-                _ => self.v_vals.get_x_const(),
+            Some(VariableName::x) => match var2 {
+                Some(VariableName::x) => self.v_vals.get_x_x(),
+                Some(VariableName::y) => self.v_vals.get_x_y(),
+                Some(VariableName::z) => self.v_vals.get_x_z(),
+                None | Some(_) => self.v_vals.get_x_const(),
             },
-            y  if y == "y" => match var2 {
-                x if x == "x" => self.v_vals.get_y_x(),
-                y if y == "y" => self.v_vals.get_y_y(),
-                z if z == "z" => self.v_vals.get_y_z(),
-                _ => self.v_vals.get_y_const(),
+            Some(VariableName::y) => match var2 {
+                Some(VariableName::x) => self.v_vals.get_y_x(),
+                Some(VariableName::y) => self.v_vals.get_y_y(),
+                Some(VariableName::z) => self.v_vals.get_y_z(),
+                None | Some(_) => self.v_vals.get_y_const(),
             },
-            z if z == "z" => match var2 {
-                x if x == "x" => self.v_vals.get_z_x(),
-                y if y == "y" => self.v_vals.get_z_y(),
-                z if z == "z" => self.v_vals.get_z_z(),
-                _ => self.v_vals.get_z_const(),
+            Some(VariableName::z) => match var2 {
+                Some(VariableName::x) => self.v_vals.get_z_x(),
+                Some(VariableName::y) => self.v_vals.get_z_y(),
+                Some(VariableName::z) => self.v_vals.get_z_z(),
+                None | Some(_) => self.v_vals.get_z_const(),
             },
-            _ => match var2 {
-                x if x == "x" => self.v_vals.get_const_x(),
-                y if y == "y" => self.v_vals.get_const_y(),
-                z if z == "z" => self.v_vals.get_const_z(),
-                _ => self.v_vals.get_const_const(),
+            None | Some(_) => match var2 {
+                Some(VariableName::x) => self.v_vals.get_const_x(),
+                Some(VariableName::y) => self.v_vals.get_const_y(),
+                Some(VariableName::z) => self.v_vals.get_const_z(),
+                None | Some(_) => self.v_vals.get_const_const(),
             }
         }
     }
@@ -185,33 +185,67 @@ impl SystemObject {
     /// The two passed variables represent the enabled object's placement variables
     /// x, y, z, phi, theta, psi. And the returning quaternion will contain the
     /// partial derivatives with respect of these two variables
-    pub fn get_quaternion(&self, var1: &str, var2: &str) -> HDQuaternion {
+    pub fn get_quaternion(&self, var1: Option<VariableName>, var2: Option<VariableName>) -> HDQuaternion {
         match var1 {
-            phi if phi == "phi" => match var2 {
-                phi if phi == "phi" => self.q_vals.get_phi_phi(),
-                theta if theta == "theta" => self.q_vals.get_phi_theta(),
-                psi if psi == "psi" => self.q_vals.get_phi_psi(),
-                _ => self.q_vals.get_phi_const(),
+            Some(VariableName::phi) => match var2 {
+                Some(VariableName::phi) => self.q_vals.get_phi_phi(),
+                Some(VariableName::theta) => self.q_vals.get_phi_theta(),
+                Some(VariableName::psi) => self.q_vals.get_phi_psi(),
+                None | Some(_) => self.q_vals.get_phi_const(),
             },
-            theta if theta == "theta" => match var2 {
-                phi if phi == "phi" => self.q_vals.get_theta_phi(),
-                theta if theta == "theta" => self.q_vals.get_theta_theta(),
-                psi if psi == "psi" => self.q_vals.get_theta_psi(),
-                _ => self.q_vals.get_theta_const(),
+            Some(VariableName::theta) => match var2 {
+                Some(VariableName::phi) => self.q_vals.get_theta_phi(),
+                Some(VariableName::theta) => self.q_vals.get_theta_theta(),
+                Some(VariableName::psi) => self.q_vals.get_theta_psi(),
+                None | Some(_) => self.q_vals.get_theta_const(),
             },
-            psi if psi == "psi" => match var2 {
-                phi if phi == "phi" => self.q_vals.get_psi_phi(),
-                theta if theta == "theta" => self.q_vals.get_psi_theta(),
-                psi if psi == "psi" => self.q_vals.get_psi_psi(),
-                _ => self.q_vals.get_psi_const(),
+            Some(VariableName::psi) => match var2 {
+                Some(VariableName::phi) => self.q_vals.get_psi_phi(),
+                Some(VariableName::theta) => self.q_vals.get_psi_theta(),
+                Some(VariableName::psi) => self.q_vals.get_psi_psi(),
+                None | Some(_) => self.q_vals.get_psi_const(),
             }
-            _ => match var2 {
-                phi if phi == "phi" => self.q_vals.get_const_phi(),
-                theta if theta == "theta" => self.q_vals.get_const_theta(),
-                psi if psi == "psi" => self.q_vals.get_const_psi(),
-                _ => self.q_vals.get_const_const(),
+            None | Some(_) => match var2 {
+                Some(VariableName::phi) => self.q_vals.get_const_phi(),
+                Some(VariableName::theta) => self.q_vals.get_const_theta(),
+                Some(VariableName::psi) => self.q_vals.get_const_psi(),
+                None | Some(_) => self.q_vals.get_const_const(),
             }
         }
+    }
+
+    /// Returns a reference to a variable of this object by name
+    pub fn get_variable(&self, var_name: VariableName) -> &Variable {
+        match var_name {
+            VariableName::x => &self.vars.x,
+            VariableName::y => &self.vars.y,
+            VariableName::z => &self.vars.z,
+            VariableName::phi => &self.vars.phi,
+            VariableName::theta => &self.vars.theta,
+            VariableName::psi => &self.vars.psi,
+        }
+    }
+
+    /// Returns a mutable reference to a variable of this object by name
+    pub fn get_mut_variable(&mut self, var_name: VariableName) -> &mut  Variable {
+        match var_name {
+            VariableName::x => &mut self.vars.x,
+            VariableName::y => &mut self.vars.y,
+            VariableName::z => &mut self.vars.z,
+            VariableName::phi => &mut self.vars.phi,
+            VariableName::theta => &mut self.vars.theta,
+            VariableName::psi => &mut self.vars.psi,
+        }
+    }
+
+    /// Gets an iterator containing the variables of this object
+    pub fn get_variables_iter(&self) -> ObjectVariablesIter<'_> {
+        self.vars.iter()
+    }
+
+    /// Gets a mutable iterator containing the variables of this object
+    pub fn get_variables_mut_iter(&mut self) -> ObjectVariablesMutIter<'_> {
+        self.vars.iter_mut()
     }
 }
 

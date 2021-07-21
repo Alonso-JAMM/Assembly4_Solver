@@ -21,7 +21,7 @@ use optimization::geometry::{HDQuaternion, HDVector};
 use optimization::number_system::HyperDualScalar as HDual;
 
 use crate::system::Variable;
-use crate::system_object::{SystemObject, VariableName as VI};
+use crate::system_object::{SystemObject, VariableName as VN};
 use crate::constraints::Constraint;
 
 
@@ -92,11 +92,6 @@ impl Constraint for FixBaseConstraint {
         let object = &sys_objects[self.obj_index];
         let reference = &sys_objects[self.ref_index];
 
-        // The variables of the object being fixed
-        let obj_variables = ["x", "y", "z"];
-        // The variables of the reference object
-        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
-
         // The first 3 variables are the object variables, then the next 6 variables
         // are the reference variables so we need a way of offsetting them
         let offset = 3;
@@ -117,14 +112,14 @@ impl Constraint for FixBaseConstraint {
         // Initially the vector and quaternion of the reference are not required
         // for the evaluation of the partial derivatives with respect to only
         // the variables of the object being fixed
-        rp = reference.get_vector("", ""); // we evaluate the object variables
-        rq = reference.get_quaternion("", ""); // no evaluate the reference variables
-        for (i, var1) in obj_variables.iter().enumerate() {
+        rp = reference.get_vector(None, None); // this
+        rq = reference.get_quaternion(None, None); // no evaluate the reference variables
+        for (i, var1) in VN::get_position_iter().enumerate() {
             // Now find the other partial derivatives with respect to the object
             // (we find the partial derivatives with respect to all the combinations
             // of x, y, z for the object)
-            for (j, var2) in obj_variables.iter().enumerate().skip(i) {
-                p = object.get_vector(var1, var2);
+            for (j, var2) in VN::get_position_iter().enumerate().skip(i) {
+                p = object.get_vector(Some(var1), Some(var2));
                 fn_eval = self.eval(object, p, rp, rq);
                 self.hess[i][j] = fn_eval.e1e2;
                 self.hess[j][i] = fn_eval.e1e2;
@@ -136,13 +131,13 @@ impl Constraint for FixBaseConstraint {
 
         // Now find the partial derivatives with respect to the variables of both
         // the object and the reference
-        for (i, var1) in obj_variables.iter().enumerate() {
+        for (i, var1) in VN::get_position_iter().enumerate() {
             // the first variable is an object variable
-            p = object.get_vector(var1, "");
-            for (j, var2) in ref_variables.iter().enumerate() {
+            p = object.get_vector(Some(var1), None);
+            for (j, var2) in VN::get_variable_iter().enumerate() {
                 // the second variable is a reference variable
-                rp = reference.get_vector("", var2);
-                rq = reference.get_quaternion("", var2);
+                rp = reference.get_vector(None, Some(var2));
+                rq = reference.get_quaternion(None, Some(var2));
                 fn_eval = self.eval(object, p, rp, rq);
                 self.hess[i][j+offset] = fn_eval.e1e2;
                 self.hess[j+offset][i] = fn_eval.e1e2;
@@ -155,11 +150,11 @@ impl Constraint for FixBaseConstraint {
         // The position vector for the object being fixed remain constant over
         // the evaluation of the partial derivatives with respect to the reference
         // object's variables.
-        p = object.get_vector("", "");
-        for (i, var1) in ref_variables.iter().enumerate() {
-            for (j, var2) in ref_variables.iter().enumerate().skip(i) {
-                rp = reference.get_vector(var1, var2);
-                rq = reference.get_quaternion(var1, var2);
+        p = object.get_vector(None, None);
+        for (i, var1) in VN::get_variable_iter().enumerate() {
+            for (j, var2) in VN::get_variable_iter().enumerate().skip(i) {
+                rp = reference.get_vector(Some(var1), Some(var2));
+                rq = reference.get_quaternion(Some(var1), Some(var2));
                 fn_eval = self.eval(object, p, rp, rq);
                 self.hess[i+offset][j+offset] = fn_eval.e1e2;
                 self.hess[j+offset][i+offset] = fn_eval.e1e2;
@@ -186,21 +181,19 @@ impl Constraint for FixBaseConstraint {
         let mut k: usize;    // variable index
         let object = &sys_objects[self.obj_index];
         let reference = &sys_objects[self.ref_index];
-        let obj_variables = ["x", "y", "z"];
-        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
         let mut var: &Variable;
         let offset = 3; // offset between object variables and reference variables
         // add the gradient values from object variables
-        for (i, variable) in obj_variables.iter().enumerate() {
-            var = object.vars.get_variable(variable);
+        for (i, var_name) in VN::get_position_iter().enumerate() {
+            var = object.get_variable(var_name);
             k = var.index;
             if var.enabled && !var.locked {
                 system_grad[k] += self.grad[i];
             }
         }
         // add the gradient values from the reference variables
-        for (i, variable) in ref_variables.iter().enumerate() {
-            var = reference.vars.get_variable(variable);
+        for (i, var_name) in VN::get_variable_iter().enumerate() {
+            var = reference.get_variable(var_name);
             k = var.index;
             if var.enabled && !var.locked {
                 system_grad[k] += self.grad[i+offset];
@@ -224,19 +217,17 @@ impl Constraint for FixBaseConstraint {
         let mut l: usize;
         let object = &sys_objects[self.obj_index];
         let reference = &sys_objects[self.ref_index];
-        let obj_variables = ["x", "y", "z"];
-        let ref_variables = ["x", "y", "z", "phi", "theta", "psi"];
         let mut variable1: &Variable;
         let mut variable2: &Variable;
         let offset = 3; // offset between object variables and reference variables
 
         // get the derivatives with respect to only the variables of the object to
         // be fixed
-        for (i, var1) in obj_variables.iter().enumerate() {
-            variable1 = object.vars.get_variable(var1);
+        for (i, var1) in VN::get_position_iter().enumerate() {
+            variable1 = object.get_variable(var1);
             k = variable1.index;
-            for (j, var2) in obj_variables.iter().enumerate() {
-                variable2 = object.vars.get_variable(var2);
+            for (j, var2) in VN::get_position_iter().enumerate() {
+                variable2 = object.get_variable(var2);
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
@@ -249,12 +240,12 @@ impl Constraint for FixBaseConstraint {
 
         // Get the derivatives with respect to both the object variables and the
         // reference variables
-        for (i, var1) in obj_variables.iter().enumerate() {
-            variable1 = object.vars.get_variable(var1);
+        for (i, var1) in VN::get_position_iter().enumerate() {
+            variable1 = object.get_variable(var1);
             k = variable1.index;
 
-            for (j, var2) in ref_variables.iter().enumerate()  {
-                variable2 = reference.vars.get_variable(var2);
+            for (j, var2) in VN::get_variable_iter().enumerate()  {
+                variable2 = reference.get_variable(var2);
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
@@ -266,11 +257,11 @@ impl Constraint for FixBaseConstraint {
         }
 
         // Get the derivatives with respect to only the reference variables
-        for (i, var1) in ref_variables.iter().enumerate() {
-            variable1 = reference.vars.get_variable(var1);
+        for (i, var1) in VN::get_variable_iter().enumerate() {
+            variable1 = reference.get_variable(var1);
             k = variable1.index;
-            for (j, var2) in ref_variables.iter().enumerate() {
-                variable2 = reference.vars.get_variable(var2);
+            for (j, var2) in VN::get_variable_iter().enumerate() {
+                variable2 = reference.get_variable(var2);
                 l = variable2.index;
 
                 if (variable1.enabled && !variable1.locked) &&
@@ -352,9 +343,9 @@ impl FixBaseConstraint {
             rp: HDVector,
             rq: HDQuaternion,
     ) -> HDual {
-        let obj_px_enabled = object.vars.x.enabled;
-        let obj_py_enabled = object.vars.y.enabled;
-        let obj_pz_enabled = object.vars.z.enabled;
+        let obj_px_enabled = object.get_variable(VN::x).enabled;
+        let obj_py_enabled = object.get_variable(VN::y).enabled;
+        let obj_pz_enabled = object.get_variable(VN::z).enabled;
 
         let f_base = self.get_f_base(obj_px_enabled, obj_py_enabled, obj_pz_enabled, &p);
 
@@ -432,9 +423,9 @@ fn add_rotation_variables(
         index_list: &mut Vec<usize>,
 ) {
     let mut k: usize;
-    for variable in ["phi", "theta", "psi"].iter() {
-        k = object.vars.get_variable(variable).index;
-        index_list.push(k);
+    for var_name in VN::get_rotation_iter() {
+        k = object.get_variable(var_name).index;
+        index_list.push(k)
     }
 }
 
@@ -445,8 +436,8 @@ fn add_position_variables(
         index_list: &mut Vec<usize>,
 ) {
     let mut k: usize;
-    for variable in ["x", "y", "z"].iter() {
-        k = object.vars.get_variable(variable).index;
+    for var_name in VN::get_position_iter() {
+        k = object.get_variable(var_name).index;
         index_list.push(k);
     }
 }

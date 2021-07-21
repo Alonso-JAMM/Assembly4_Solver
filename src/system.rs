@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 use crate::constraints::*;
-use crate::system_object::{SystemObject, VariableName};
+use crate::system_object::{SystemObject, VariableName as VN};
 use ndarray::{Array1, Array2};
 
 use optimization::problem::{Objective, Gradient, Hessian};
@@ -40,7 +40,7 @@ pub struct Variable {
     pub enabled: bool,
     /// contains the index of the variable that is equal to this variable or none
     /// if an equality constraint is not applied
-    pub equal: Option<(usize, VariableName)>,
+    pub equal: Option<(usize, VN)>,
 }
 
 impl Variable {
@@ -94,10 +94,11 @@ impl<'a> System<'a> {
 
                 // initial value of each variable
                 let mut x: f64;
+                let var_names_str = ["x", "y", "z", "phi", "theta", "psi"];
 
-                for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
-                    let mut new_var = new_object.vars.get_mut_variable(variable);
-                    x = *object_params.get(variable).unwrap();
+                for (var_name_str, var_name) in var_names_str.iter().zip(VN::get_variable_iter()) {
+                    let mut new_var = new_object.get_mut_variable(var_name);
+                    x = *object_params.get(var_name_str).unwrap();
                     new_var.value = x;
                     new_var.initial_value = x;
                 }
@@ -115,7 +116,7 @@ impl<'a> System<'a> {
     pub fn add_indices(&mut self) {
         let mut i = 0;
         for obj in self.sys_objects.iter_mut() {
-            for variable in &mut obj.vars.iter_mut() {
+            for variable in &mut obj.get_variables_mut_iter() {
                 if variable.enabled {
                     match variable.equal {
                         // we add indices of equal variables later
@@ -138,13 +139,11 @@ impl<'a> System<'a> {
         // to an index of 0?
         // NOTE: we use indices since we need to have both immutable and mutable
         // access to self.variables
-        let vars = [VariableName::x, VariableName::y, VariableName::z,
-                    VariableName::phi, VariableName::theta, VariableName::psi];
         for i in 0..self.sys_objects.len() {
-            for var_idx in &vars {
-                if let Some((j, j_var_idx)) = self.sys_objects[i].vars[*var_idx].equal {
-                    self.sys_objects[i].vars[*var_idx].index = self.sys_objects[j].vars[j_var_idx].index;
-                    self.sys_objects[i].vars[*var_idx].initial_value = self.sys_objects[j].vars[j_var_idx].initial_value;
+            for var_name in VN::get_variable_iter() {
+                if let Some((j, j_var_name)) = self.sys_objects[i].get_variable(var_name).equal {
+                    self.sys_objects[i].get_mut_variable(var_name).index = self.sys_objects[j].get_variable(j_var_name).index;
+                    self.sys_objects[i].get_mut_variable(var_name).initial_value = self.sys_objects[j].get_variable(j_var_name).initial_value;
                 }
             }
 
@@ -156,7 +155,7 @@ impl<'a> System<'a> {
     pub fn get_enabled_size(&self) -> usize {
         let mut i = 0;
         for obj in self.sys_objects.iter() {
-            for variable in obj.vars.iter() {
+            for variable in obj.get_variables_iter() {
                 if variable.enabled {
                     i += 1;
                 }
@@ -170,7 +169,7 @@ impl<'a> System<'a> {
         let n = self.get_enabled_size();
         let mut output = Array1::zeros(n);
         for obj in self.sys_objects.iter() {
-            for variable in obj.vars.iter() {
+            for variable in obj.get_variables_iter() {
                 if variable.enabled {
                     output[variable.index] = variable.initial_value;
                 }
@@ -199,7 +198,7 @@ impl<'a> Objective for System<'a> {
 
     fn update_x(&mut self, x: &Array1<f64>) {
         for obj in &mut self.sys_objects {
-            for variable in &mut obj.vars.iter_mut() {
+            for variable in &mut obj.get_variables_mut_iter() {
                 if variable.enabled && !variable.locked {
                     variable.value = x[variable.index];
                 }
