@@ -29,8 +29,6 @@ pub struct Variable {
     pub index: usize,
     /// value of the variable during iteration process
     pub value: f64,
-    /// value of the variable at the start of the iteration process
-    pub initial_value: f64,
     /// States whether the value of this variable is locked. If set to true,
     /// then the initial_value will be used during the iteration process without
     /// changing it.
@@ -48,7 +46,6 @@ impl Variable {
         Variable {
             index: 0,
             value: 0.0,
-            initial_value: 0.0,
             locked: false,
             enabled: false,
             equal: None,
@@ -100,7 +97,6 @@ impl<'a> System<'a> {
                     let mut new_var = new_object.get_mut_variable(var_name);
                     x = *object_params.get(var_name_str).unwrap();
                     new_var.value = x;
-                    new_var.initial_value = x;
                 }
                 self.sys_objects.push(new_object);
                 // object index in the system object HashMap
@@ -143,7 +139,6 @@ impl<'a> System<'a> {
             for var_name in VN::get_variable_iter() {
                 if let Some((j, j_var_name)) = self.sys_objects[i].get_variable(var_name).equal {
                     self.sys_objects[i].get_mut_variable(var_name).index = self.sys_objects[j].get_variable(j_var_name).index;
-                    self.sys_objects[i].get_mut_variable(var_name).initial_value = self.sys_objects[j].get_variable(j_var_name).initial_value;
                 }
             }
 
@@ -171,7 +166,7 @@ impl<'a> System<'a> {
         for obj in self.sys_objects.iter() {
             for variable in obj.get_variables_iter() {
                 if variable.enabled {
-                    output[variable.index] = variable.initial_value;
+                    output[variable.index] = variable.value;
                 }
             }
         }
