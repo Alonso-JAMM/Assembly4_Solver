@@ -146,8 +146,12 @@ impl<'a> System<'a> {
         let mut i = 0;
         for obj in self.sys_objects.iter() {
             for variable in obj.get_variables_iter() {
-                if variable.enabled {
-                    i += 1;
+                if variable.enabled && !variable.locked {
+                    if let None = variable.equal {
+                        // Only consider variables that are enabled, unlocked and
+                        // that are not equal to other variables
+                        i += 1;
+                    }
                 }
             }
         }
