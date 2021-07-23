@@ -26,7 +26,7 @@ use optimization::problem::{Objective, Gradient, Hessian};
 #[derive(Debug)]
 pub struct Variable {
     /// index of this variable in the solver array
-    pub index: usize,
+    pub index: Option<usize>,
     /// value of the variable during iteration process
     pub value: f64,
     /// States whether the value of this variable is locked. If set to true,
@@ -44,7 +44,7 @@ pub struct Variable {
 impl Variable {
     pub fn new() -> Variable {
         Variable {
-            index: 0,
+            index: None,
             value: 0.0,
             locked: false,
             enabled: false,
@@ -120,7 +120,7 @@ impl<'a> System<'a> {
                         None => {
                             // Only add indices to unlocked variable
                             if !variable.locked {
-                                variable.index = i;
+                                variable.index = Some(i);
                                 i += 1;
                             }
                         }
@@ -128,17 +128,12 @@ impl<'a> System<'a> {
                 }
             }
         }
-        // We add indices to equal variables here because variables default with
-        // and index of 0 which means that we don't know if the other variable
-        // has an index of 0 or if its index is not defined yet.
-        // TODO: Would using Option<usize> for indices be better than defaulting
-        // to an index of 0?
-        // NOTE: we use indices since we need to have both immutable and mutable
-        // access to self.variables
+        let mut new_index: Option<usize>;
         for i in 0..self.sys_objects.len() {
             for var_name in VN::get_variable_iter() {
                 if let Some((j, j_var_name)) = self.sys_objects[i].get_variable(var_name).equal {
-                    self.sys_objects[i].get_mut_variable(var_name).index = self.sys_objects[j].get_variable(j_var_name).index;
+                    new_index = self.sys_objects[j].get_variable(j_var_name).index;
+                    self.sys_objects[i].get_mut_variable(var_name).index = new_index;
                 }
             }
 
@@ -165,8 +160,8 @@ impl<'a> System<'a> {
         let mut output = Array1::zeros(n);
         for obj in self.sys_objects.iter() {
             for variable in obj.get_variables_iter() {
-                if variable.enabled {
-                    output[variable.index] = variable.value;
+                if let Some(k) = variable.index {
+                    output[k] = variable.value;
                 }
             }
         }
@@ -194,8 +189,8 @@ impl<'a> Objective for System<'a> {
     fn update_x(&mut self, x: &Array1<f64>) {
         for obj in &mut self.sys_objects {
             for variable in &mut obj.get_variables_mut_iter() {
-                if variable.enabled && !variable.locked {
-                    variable.value = x[variable.index];
+                if let Some(k) = variable.index {
+                    variable.value = x[k];
                 }
             }
             if obj.q_enable {

@@ -178,7 +178,6 @@ impl Constraint for FixBaseConstraint {
             system_grad: &mut Array1<f64>,
             sys_objects: &Vec<SystemObject>,
     ) {
-        let mut k: usize;    // variable index
         let object = &sys_objects[self.obj_index];
         let reference = &sys_objects[self.ref_index];
         let mut var: &Variable;
@@ -186,16 +185,14 @@ impl Constraint for FixBaseConstraint {
         // add the gradient values from object variables
         for (i, var_name) in VN::get_position_iter().enumerate() {
             var = object.get_variable(var_name);
-            k = var.index;
-            if var.enabled && !var.locked {
+            if let Some(k) = var.index {
                 system_grad[k] += self.grad[i];
             }
         }
         // add the gradient values from the reference variables
         for (i, var_name) in VN::get_variable_iter().enumerate() {
             var = reference.get_variable(var_name);
-            k = var.index;
-            if var.enabled && !var.locked {
+            if let Some(k) = var.index {
                 system_grad[k] += self.grad[i+offset];
             }
         }
@@ -213,8 +210,6 @@ impl Constraint for FixBaseConstraint {
             sys_objects: &Vec<SystemObject>,
     ) {
         // system indices of the variables
-        let mut k: usize;
-        let mut l: usize;
         let object = &sys_objects[self.obj_index];
         let reference = &sys_objects[self.ref_index];
         let mut variable1: &Variable;
@@ -225,16 +220,13 @@ impl Constraint for FixBaseConstraint {
         // be fixed
         for (i, var1) in VN::get_position_iter().enumerate() {
             variable1 = object.get_variable(var1);
-            k = variable1.index;
-            for (j, var2) in VN::get_position_iter().enumerate() {
-                variable2 = object.get_variable(var2);
-                l = variable2.index;
-
-                if (variable1.enabled && !variable1.locked) &&
-                   (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[i][j];
+            if let Some(k) = variable1.index {
+                for (j, var2) in VN::get_position_iter().enumerate() {
+                    variable2 = object.get_variable(var2);
+                    if let Some(l) = variable2.index {
+                        system_hess[[k, l]] += self.hess[i][j];
+                    }
                 }
-
             }
         }
 
@@ -242,16 +234,13 @@ impl Constraint for FixBaseConstraint {
         // reference variables
         for (i, var1) in VN::get_position_iter().enumerate() {
             variable1 = object.get_variable(var1);
-            k = variable1.index;
-
-            for (j, var2) in VN::get_variable_iter().enumerate()  {
-                variable2 = reference.get_variable(var2);
-                l = variable2.index;
-
-                if (variable1.enabled && !variable1.locked) &&
-                   (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[i][j+offset];
-                    system_hess[[l, k]] += self.hess[j+offset][i];
+            if let Some(k) = variable1.index {
+                for (j, var2) in VN::get_variable_iter().enumerate() {
+                    variable2 = reference.get_variable(var2);
+                    if let Some(l) = variable2.index {
+                        system_hess[[k, l]] += self.hess[i][j+offset];
+                        system_hess[[l, k]] += self.hess[j+offset][i];
+                    }
                 }
             }
         }
@@ -259,14 +248,12 @@ impl Constraint for FixBaseConstraint {
         // Get the derivatives with respect to only the reference variables
         for (i, var1) in VN::get_variable_iter().enumerate() {
             variable1 = reference.get_variable(var1);
-            k = variable1.index;
-            for (j, var2) in VN::get_variable_iter().enumerate() {
-                variable2 = reference.get_variable(var2);
-                l = variable2.index;
-
-                if (variable1.enabled && !variable1.locked) &&
-                   (variable2.enabled && !variable2.locked) {
-                    system_hess[[k, l]] += self.hess[i+offset][j+offset];
+            if let Some(k) = variable1.index {
+                for (j, var2) in VN::get_variable_iter().enumerate() {
+                    variable2 = reference.get_variable(var2);
+                    if let Some(l) = variable2.index {
+                        system_hess[[k, l]] += self.hess[i+offset][j+offset];
+                    }
                 }
             }
         }
@@ -424,8 +411,12 @@ fn add_rotation_variables(
 ) {
     let mut k: usize;
     for var_name in VN::get_rotation_iter() {
-        k = object.get_variable(var_name).index;
-        index_list.push(k)
+//         k = object.get_variable(var_name).index;
+//         index_list.push(k);
+        if let Some(k) = object.get_variable(var_name).index {
+            // This does not do anything; however, index_list is actually not used
+            // TODO: Remove index_list
+        }
     }
 }
 
@@ -437,7 +428,8 @@ fn add_position_variables(
 ) {
     let mut k: usize;
     for var_name in VN::get_position_iter() {
-        k = object.get_variable(var_name).index;
-        index_list.push(k);
+//         k = object.get_variable(var_name).index;
+//         index_list.push(k);
+        // TODO: remove index_list since it is not used for anything
     }
 }
