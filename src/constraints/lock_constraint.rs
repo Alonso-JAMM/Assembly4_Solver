@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use crate::system_object::SystemObject;
+use crate::system_object::{SystemObject, VariableName as VN};
 
 /// This function adds the lock constraints to the variables being locked.
 pub fn set_up_locks(
@@ -23,11 +23,13 @@ pub fn set_up_locks(
         sys_object: &mut SystemObject,
 ) {
     let mut locked_variables: Vec<&str> = Vec::new();
+    let var_names_str = ["x", "y", "z", "phi", "theta", "psi"];
 
-    for variable in ["x", "y", "z", "phi", "theta", "psi"].iter() {
-        match c_params.get(variable) {
-            Some(_) => {
-                locked_variables.push(variable);
+    for (variable_str, variable_name) in var_names_str.iter().zip(VN::get_variable_iter()) {
+        match c_params.get(variable_str) {
+            Some(value) => {
+                locked_variables.push(variable_str);
+                sys_object.get_mut_variable(variable_name).value = *value;
             },
             None => ()
         }
