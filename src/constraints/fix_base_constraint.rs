@@ -61,6 +61,17 @@ impl FixParameters {
 /// of all variables in the constraint system. This terminology is taken from
 /// "Numerical Optimization" second edition written by Jorge Nocedal and Stephen
 /// J. Wright from chapter 7.4 (Partially separable functions).
+///
+/// NOTE: the indices of the local variables used in this constraint are the following:
+/// 0 -> object.x
+/// 1 -> object.y
+/// 2 -> object.z
+/// 3 -> reference.x
+/// 4 -> reference.y
+/// 5 -> reference.z
+/// 6 -> reference.phi
+/// 7 -> reference.theta
+/// 8 -> reference.psi
 #[derive(Debug)]
 pub struct FixBaseConstraint {
     /// value of phi(y)^2
@@ -69,9 +80,6 @@ pub struct FixBaseConstraint {
     grad: [f64; 9],
     /// hessian matrix of phi(y)^2
     hess: [[f64; 9]; 9],
-    /// system variables indices of the internal variables. These are the
-    /// indices of the variables in the system variable vector.
-    index_list: Vec<usize>,
     /// Fix constraint values for the 3 position axis. These values represent
     /// "how far away" we are fixing the object with respect to the local coordinate
     /// system of the reference object.
@@ -291,18 +299,6 @@ impl FixBaseConstraint {
             sys_reference.q_enable = true;
         }
 
-        let sys_object = &system_objects[obj_index];
-        let sys_reference = &system_objects[ref_index];
-
-        // Add the position and rotation variables to the object and reference
-        // indices. Here we add all the indices of all the variables even the
-        // disabled variables since we need to know their values when evaluating
-        // the constraint function
-        let mut index_list = Vec::new();
-        add_position_variables(sys_object, &mut index_list);
-        add_position_variables(sys_reference, &mut index_list);
-        add_rotation_variables(sys_reference, &mut index_list);
-
         // Adds the "offset" values used in the constraint function. Note that
         // the parameters of the disabled axes will be set to a value of 0.
         // However, these values will not be used when evaluating the constraint
@@ -314,7 +310,6 @@ impl FixBaseConstraint {
             value: 0.0,
             grad: [0.0; 9],
             hess: [[0.0; 9]; 9],
-            index_list,
             parameters,
             obj_index,
             ref_index,
@@ -399,37 +394,5 @@ fn add_parameters(
             Some(value) => parameters.set_parameter(variable, *value),
             None => ()
         }
-    }
-}
-
-
-/// Adds the phi, theta, psi variables to the indices
-/// Note that we only add these variables to the reference object.
-fn add_rotation_variables(
-        object: &SystemObject,
-        index_list: &mut Vec<usize>,
-) {
-    let mut k: usize;
-    for var_name in VN::get_rotation_iter() {
-//         k = object.get_variable(var_name).index;
-//         index_list.push(k);
-        if let Some(k) = object.get_variable(var_name).index {
-            // This does not do anything; however, index_list is actually not used
-            // TODO: Remove index_list
-        }
-    }
-}
-
-
-/// Adds the x, y, and z variables to the indices.
-fn add_position_variables(
-        object: &SystemObject,
-        index_list: &mut Vec<usize>,
-) {
-    let mut k: usize;
-    for var_name in VN::get_position_iter() {
-//         k = object.get_variable(var_name).index;
-//         index_list.push(k);
-        // TODO: remove index_list since it is not used for anything
     }
 }
