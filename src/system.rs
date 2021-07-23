@@ -29,9 +29,9 @@ pub struct Variable {
     pub index: Option<usize>,
     /// value of the variable during iteration process
     pub value: f64,
-    /// States whether the value of this variable is locked. If set to true,
-    /// then the initial_value will be used during the iteration process without
-    /// changing it.
+    /// States whether the value of this variable is locked. If set to true, then
+    /// the initial value given to this variable will be used throughout the solving
+    /// process.
     pub locked: bool,
     /// determines whether the variable is enabled or not. If not enabled, then
     /// this variable will be ignored
