@@ -25,18 +25,21 @@ class Assembly4Solver(Gui.Workbench):
 
     MenuText = "Assembly 4 Solver"
     ToolTip = "Adds and solves constraints for Assembly 4"
-    commands = ["TestCommand"]
+    commands = [
+        "LockConstraintCmd"
+    ]
 
     def GetClassName(self):
         return "Gui::PythonWorkbench"
 
     def Initialize(self):
         App.Console.PrintMessage("Starting Assembly4 Solver")
-        from .commands import TestCommand
+        from .AddConstraints.AddLockConstraint import LockConstraintCmd
 
+        self.appendToolbar("asm4_solver", self.commands)
         self.appendMenu("asm4_solver", self.commands)
 
-        Gui.addCommand("TestCommand", TestCommand())
+        Gui.addCommand("LockConstraintCmd", LockConstraintCmd())
 
     def Activated(self):
         pass

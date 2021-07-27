@@ -1,2 +1,3 @@
 include Cargo.toml
 recursive-include src *
+recursive-include freecad/asm4_solver/Resources *

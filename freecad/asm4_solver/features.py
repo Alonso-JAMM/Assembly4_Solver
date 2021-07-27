@@ -13,6 +13,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 
 
-import FreeCAD as App
-import FreeCADGui as Gui
+import os
 
+
+def getResourcesDir():
+    """Returns the directory of the icon folder"""
+    return os.path.join(os.path.dirname(__file__), "Resources")
