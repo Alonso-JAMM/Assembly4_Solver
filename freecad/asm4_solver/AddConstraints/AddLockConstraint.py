@@ -19,6 +19,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 import libAsm4 as asm4
 from ..features import getResourcesDir
+from .AddConstraintSystem import ConstraintSystem
 
 
 class LockConstraintCmd:
@@ -31,7 +32,8 @@ class LockConstraintCmd:
         }
 
     def IsActive(self):
-        if App.ActiveDocument:
+        constraintObject = App.ActiveDocument.getObject(ConstraintSystem.name)
+        if App.ActiveDocument and constraintObject is not None:
             return(True)
         else:
             return(False)
