@@ -3,7 +3,7 @@ from setuptools_rust import RustExtension
 
 
 setup(name="asm4_solver",
-      version="0.2.0",
+      version="0.3.0",
       rust_extensions=[RustExtension("asm4_solver.solver")],
       packages=["freecad",
                 "freecad.asm4_solver",
@@ -12,6 +12,6 @@ setup(name="asm4_solver",
       maintainer="Alonso-JAMM",
       url="https://github.com/Alonso-JAMM/Assembly4_Solver",
       description="Solver for Assembly4",
-      install_requires=["numpy"],
+      install_requires=["numpy", "networkx"],
       include_package_data=True,
       zip_safe=False)
