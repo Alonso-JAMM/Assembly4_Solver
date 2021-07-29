@@ -13,7 +13,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 
 
-import os
 import FreeCADGui as Gui
 import FreeCAD as App
 
@@ -36,9 +35,9 @@ class Assembly4Solver(Gui.Workbench):
 
     def Initialize(self):
         App.Console.PrintMessage("Starting Assembly4 Solver")
-        from .AddConstraints.AddLockConstraint import LockConstraintCmd
-        from .AddConstraints.AddConstraintSystem import ConstraintSystemCmd
-        from .AddConstraints.SolveSystem import SolveSystemCmd
+        from .Commands.LockConstraint import LockConstraintCmd
+        from .Commands.ConstraintSystem import ConstraintSystemCmd
+        from .Commands.SolveSystem import SolveSystemCmd
 
         self.appendToolbar("asm4_solver", self.commands)
         self.appendMenu("asm4_solver", self.commands)

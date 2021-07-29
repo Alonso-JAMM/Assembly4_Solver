@@ -19,7 +19,7 @@ from math import pi
 import FreeCAD as App
 from asm4_solver.solver import solve_constraint_system
 from ..features import getResourcesDir
-from .AddConstraintSystem import ConstraintSystem as CS
+from .ConstraintSystem import ConstraintSystem as CS
 
 
 class SolveSystemCmd:

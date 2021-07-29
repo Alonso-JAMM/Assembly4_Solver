@@ -20,7 +20,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 import libAsm4 as asm4
 from ..features import getResourcesDir
-from .AddConstraintSystem import ConstraintSystem
+from .ConstraintSystem import ConstraintSystem
 
 
 class LockConstraintCmd:
