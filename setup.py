@@ -3,7 +3,7 @@ from setuptools_rust import RustExtension
 
 
 setup(name="asm4_solver",
-      version="0.5.0",
+      version="0.5.1",
       rust_extensions=[RustExtension("asm4_solver.solver")],
       packages=["freecad",
                 "freecad.asm4_solver",

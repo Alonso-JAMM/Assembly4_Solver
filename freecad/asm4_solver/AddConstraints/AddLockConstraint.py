@@ -14,6 +14,7 @@
 
 
 import os
+from math import pi
 from PySide import QtGui
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -158,6 +159,9 @@ class LockConstraint:
         if not getattr(obj, prop):
             obj.Parameters.pop(param, None)
         else:
-            obj.Parameters[param] = getattr(obj, valueProp)
+            val = getattr(obj, valueProp)
+            if "Rotation" in prop:
+                val = val*pi/180
+            obj.Parameters[param] = val
         # update the reduced degrees of freedom from this constraint
         obj.reduced_DoF = len(obj.Parameters)
