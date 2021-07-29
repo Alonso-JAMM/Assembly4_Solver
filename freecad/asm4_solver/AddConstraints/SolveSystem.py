@@ -15,8 +15,9 @@
 
 import os
 import time
+from math import pi
 import FreeCAD as App
-from asm4_solver.solver import build_constraints
+from asm4_solver.solver import solve_constraint_system
 from ..features import getResourcesDir
 from .AddConstraintSystem import ConstraintSystem as CS
 
@@ -43,9 +44,23 @@ class SolveSystemCmd:
         objects = CS.getObjects()
         constraintNames = CS.getConstraintNames()
         constraintParams = CS.getConstraintParameters()
-        build_constraints(objects, constraintNames, constraintParams)
-        # TODO: get the new object placement variables and apply them to the
-        # objects (checking that a solution was found)
+        new_objects, success = solve_constraint_system(objects,
+                                                       constraintNames,
+                                                       constraintParams)
+        if not success:
+            App.Console.PrintError("Couldn't solve the system!")
+            return
+
+        for objName, new_vals in new_objects.items():
+            obj = App.ActiveDocument.getObject(objName)
+            obj.Placement.Base.x = new_vals["x"]
+            obj.Placement.Base.y = new_vals["y"]
+            obj.Placement.Base.z = new_vals["z"]
+            newRotation = App.Rotation(new_vals["psi"]*180/pi,
+                                       new_vals["theta"]*180/pi,
+                                       new_vals["phi"]*180/pi)
+            obj.Placement.Rotation = newRotation
+        App.Console.PrintMessage("Solved the system successfully!")
         App.ActiveDocument.recompute()
         timeUsed = time.time() - t
         print(f"solver took {timeUsed}")
