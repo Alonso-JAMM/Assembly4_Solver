@@ -28,6 +28,7 @@ class Assembly4Solver(Gui.Workbench):
     commands = [
         "LockConstraintCmd",
         "ConstraintSystemCmd",
+        "SolveSystemCmd",
     ]
 
     def GetClassName(self):
@@ -37,12 +38,14 @@ class Assembly4Solver(Gui.Workbench):
         App.Console.PrintMessage("Starting Assembly4 Solver")
         from .AddConstraints.AddLockConstraint import LockConstraintCmd
         from .AddConstraints.AddConstraintSystem import ConstraintSystemCmd
+        from .AddConstraints.SolveSystem import SolveSystemCmd
 
         self.appendToolbar("asm4_solver", self.commands)
         self.appendMenu("asm4_solver", self.commands)
 
         Gui.addCommand("LockConstraintCmd", LockConstraintCmd())
         Gui.addCommand("ConstraintSystemCmd", ConstraintSystemCmd())
+        Gui.addCommand("SolveSystemCmd", SolveSystemCmd())
 
     def Activated(self):
         pass
