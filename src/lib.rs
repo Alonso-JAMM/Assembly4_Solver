@@ -24,12 +24,14 @@ mod geometry;
 mod system;
 use system::System;
 mod system_object;
+use system_object::VariableName as VN;
 
 use optimization::TrustNCG;
 
+
 #[pymodule]
 fn solver(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_wrapped(wrap_pyfunction!(build_constraints))?;
+    m.add_wrapped(wrap_pyfunction!(solve_constraint_system))?;
 
     Ok(())
 }
@@ -44,11 +46,11 @@ fn solver(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
 ///     constraint will be omitted in this map (if a lock constraint does not
 ///     lock the x-axis, then it will not be included in constraint_parameters)
 #[pyfunction]
-fn build_constraints(
-    objects: HashMap<&str, HashMap<&str, f64>>,
-    constraint_names: HashMap<&str, HashMap<&str, &str>>,
-    constraint_parameters: HashMap<&str, HashMap<&str, f64>>,
-) {
+fn solve_constraint_system<'a>(
+    mut objects: HashMap<&'a str, HashMap<&'a str, f64>>,
+    constraint_names: HashMap<&'a str, HashMap<&'a str, &str>>,
+    constraint_parameters: HashMap<&'a str, HashMap<&'a str, f64>>,
+) -> (HashMap<&'a str, HashMap<&'a str, f64>>, bool) {
     // Here we store the system information.
     let mut system = System::new();
 
@@ -138,16 +140,28 @@ fn build_constraints(
 
     // Un-comment this part in order to solve the problem (it is faster than the
     // implementation in python
-//         system.add_indices();
-//         let x0 = system.start_position();
-//
-//         let mut min = TrustNCG::new();
-//         min.i_max = 11;
-//
-//         let sol = min.minimize(&x0, &mut system);
-//
+        system.add_indices();
+        let x0 = system.start_position();
+
+        let mut min = TrustNCG::new();
+
+        let sol = min.minimize(&x0, &mut system);
+
 //         println!("Solution succeeded?: {}, iterations: {}, function evaluations: {}, \
 //         gradient evaluations: {}", sol.success, sol.iter_num, sol.f_evals, sol.f_grad_evals);
 //         println!("solution x: {}", sol.x);
 
+
+        let mut obj_idx: usize;
+        let mut sys_object: &system_object::SystemObject;
+        let mut var_name: VN;
+        for (obj, vars) in objects.iter_mut() {
+            obj_idx = *system.sys_objects_idx.get(obj).unwrap();
+            sys_object = &system.sys_objects[obj_idx];
+            for (var_name_str, var_value ) in vars.iter_mut() {
+                var_name = VN::get_from_str(var_name_str);
+                *var_value = sys_object.get_variable(var_name).value;
+            }
+        }
+        (objects, sol.success)
 }
