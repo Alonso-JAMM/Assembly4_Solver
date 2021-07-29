@@ -156,6 +156,15 @@ class LockConstraint:
     @staticmethod
     def changeParameterValue(obj, param, prop):
         valueProp = prop + "_val"
+        # When loading the document the object properties are touched;
+        # however, not all the properties are loaded yet which gives
+        # errors related to the object not having a property. So we
+        # do nothing if the valueProp has not being loaded yet.
+        # The information about the fix constraint value is already
+        # in the dictionary when loading the object.
+        if not hasattr(obj, valueProp) or not hasattr(obj, "reduced_DoF"):
+            return
+
         if not getattr(obj, prop):
             obj.Parameters.pop(param, None)
         else:
